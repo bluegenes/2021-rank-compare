@@ -1,0 +1,29 @@
+# location for all generated files
+basename: ruminococcusB
+
+#output_dir: output.ruminococcusB
+output_dir: genbank
+
+taxonomy_csv: gtdb-rs202.g__Ruminococcus_B.with-repinfo.csv 
+
+run_alphabets:
+  #- nucleotide
+  - protein
+  - dayhoff
+
+
+alphabet_info:
+  nucleotide:
+    #ksize: 21
+    ksize: [21,31,51]
+    scaled: [1000,2000]
+  protein:
+    #ksize: 7
+    ksize: [6,7,8,9,10,11]
+    scaled: [100,200]
+  dayhoff:
+    ksize: [14,15,16,17,18,19]
+    scaled: [100,200]
+  hp:
+    ksize: [32,35,42]
+    scaled: [100,200]

@@ -89,7 +89,7 @@ def get_tax_name_for_taxid(taxid):
 
 
 def main(args):
-    fieldnames = ["acc", "genome_url", "assembly_report_url", "ncbi_tax_name", "ncbi_taxid"]
+    fieldnames = ["acc", "genome_url", "protein_url", "assembly_report_url", "ncbi_tax_name", "ncbi_taxid"]
     if args.output:
         fp = open(args.output, "wt")
         w = csv.DictWriter(fp, fieldnames=fieldnames)
@@ -97,40 +97,32 @@ def main(args):
         w = csv.DictWriter(sys.stdout, fieldnames=fieldnames)
     w.writeheader()
 
-    with open(args.taxonomy_csv, 'rt') as fp:
-        r = csv.DictReader(fp)
-        header = r.fieldnames
-        # check for empty file
-        if not header:
-            raise ValueError(f'Cannot read taxonomy information from {taxonomy_csv}. Is file empty?')
+    acc = args.accession
 
-        for n, row in enumerate(r):
-            acc = row['ident']
+    genome_url, protein_url, assembly_report_url = url_for_accession(acc)
+    taxid = get_taxid_from_assembly_report(assembly_report_url)
+    tax_name = get_tax_name_for_taxid(taxid)
 
-            #acc = args.accession
+    d = dict(
+        acc=acc,
+        genome_url=genome_url,
+        protein_url=protein_url,
+        assembly_report_url=assembly_report_url,
+        ncbi_tax_name=tax_name,
+        ncbi_taxid=taxid,
+    )
 
-            genome_url, protein_url, assembly_report_url = url_for_accession(acc)
-            taxid = get_taxid_from_assembly_report(assembly_report_url)
-            tax_name = get_tax_name_for_taxid(taxid)
-
-            d = dict(
-                acc=acc,
-                genome_url=genome_url,
-                assembly_report_url=assembly_report_url,
-                ncbi_tax_name=tax_name,
-                ncbi_taxid=taxid,
-            )
-
-            w.writerow(d)
-            if n % 1000 == 0:
-                print(f"retrieved for {acc} - {tax_name}", file=sys.stderr)
+    w.writerow(d)
+    print(f"retrieved for {acc} - {tax_name}", file=sys.stderr)
+    if fp:
+        fp.close()
 
     return 0
 
 def cmdline(sys_args):
     "Command line entry point w/argparse action."
     p = argparse.ArgumentParser()
-    p.add_argument("taxonomy_csv")
+    p.add_argument("accession")
     p.add_argument("-o", "--output")
     args = p.parse_args()
     return main(args)

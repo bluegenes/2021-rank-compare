@@ -1,0 +1,8 @@
+name: bf-env
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - khmer=3.0.0
+  - sourmash>4,<5
