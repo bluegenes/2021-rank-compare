@@ -1,0 +1,12 @@
+name: 2021-rank-compare
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - python=3.8
+  - snakemake=6.6.1
+  - pandas>=1.2.4
+  - seaborn=0.11.0
+  - sourmash>=4.2.1
+  - lxml=4.6.3
