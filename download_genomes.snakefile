@@ -1,5 +1,3 @@
-# from https://raw.githubusercontent.com/ctb/2021-sourmash-unroll-compare/latest/download_genomes/Snakefile
-
 import csv
 import pandas as pd
 
