@@ -42,7 +42,13 @@ def main(args):
             if is_protein:
                 mh.add_protein(record.sequence)
             else:
-                mh.add_sequence(record.sequence)
+                #handle invalid DNA chars that may exist in sequence
+                if 'N' in record.sequence:
+                    seqs = record.sequence.split('N')
+                    for seq in seqs:
+                        mh.add_sequence(seq)
+                else:
+                    mh.add_sequence(record.sequence)
             # upd after each seq? Or build mh of entire file, then update?
             bloom_filter.update(mh)
             mh.clear()

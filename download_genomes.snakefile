@@ -84,7 +84,7 @@ rule all:
         expand(f"{out_dir}/count-kmers/{{acc}}.nucleotide-k{{ksize}}.unique-kmers.txt", acc=ACCS, ksize = nucl_ksizes),
         expand(f"{out_dir}/count-kmers/{{acc}}.protein-k{{ksize}}.unique-kmers.txt", acc=ACCS, ksize = prot_ksizes),
         f"genbank/kmer-counts.csv",
-        expand(f"{out_dir}/{basename}.{{alphak}}.nodegraph", alphak=alpha_ksizes),
+        #expand(f"{out_dir}/{basename}.{{alphak}}.nodegraph", alphak=alpha_ksizes),
         expand(f"{out_dir}/script-nodegraphs/{basename}.{{alphak}}.nodegraph",alphak=alpha_ksizes),
         #expand("genbank/genomes/{acc}_genomic.fna.gz", acc=ACCS),
         #expand("genbank/proteomes/{acc}_protein.faa.gz", acc=ACCS)
@@ -290,7 +290,7 @@ rule make_protein_bloom_filter_script:
     threads: 10
     resources:
         mem=100000,
-    conda: "conf/envs/bf.yml"
+    #conda: "conf/envs/bf.yml"
     shell:
         """
         python protein-bf.py {input} --output {output} -k {wildcards.ksize} --alphabet protein 2> {log}
@@ -303,7 +303,7 @@ rule make_nucl_bloom_filter_script:
     threads: 10
     resources:
         mem=100000,
-    conda: "conf/envs/bf.yml"
+    #conda: "conf/envs/bf.yml"
     shell:
         """
         python protein-bf.py {input} --output {output} -k {wildcards.ksize} --alphabet nucleotide 2> {log}
