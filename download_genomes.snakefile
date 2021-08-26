@@ -286,7 +286,7 @@ rule make_bloom_filter_cmdline:
 rule make_protein_bloom_filter_script:
     input: fasta=Checkpoint_MakePattern("{fastafile}")
     output: f"{out_dir}/script-nodegraphs/{basename}.protein-k{{ksize}}.nodegraph"
-    log: f"{logs_dir}/script-nodegraph/{basename}.protein-k{{ksize}}.log"
+    log: f"{logs_dir}/script-nodegraphs/{basename}.protein-k{{ksize}}.log"
     threads: 10
     resources:
         mem=100000,
@@ -299,7 +299,7 @@ rule make_protein_bloom_filter_script:
 rule make_nucl_bloom_filter_script:
     input: expand("genbank/genomes/{acc}_genomic.fna.gz", acc=ACCS),
     output: f"{out_dir}/script-nodegraphs/{basename}.nucleotide-k{{ksize}}.nodegraph"
-    log: f"{logs_dir}/script-nodegraph/{basename}.nucleotide-k{{ksize}}.log"
+    log: f"{logs_dir}/script-nodegraphs/{basename}.nucleotide-k{{ksize}}.log"
     threads: 10
     resources:
         mem=100000,
