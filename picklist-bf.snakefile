@@ -21,8 +21,7 @@ out_dir = config['output_dir']
 class Checkpoint_MakePattern:
     def __init__(self, pattern):
         self.pattern = pattern
-        # to do -- check if this actually works, or it's just being done in __call__
-        self.prot_fastafiles=self.update_fapaths()
+        self.prot_fastafiles = None
 
     def update_fapaths(self, basename=basename, acc=None, ksize=None):
         with open(f"genbank/{basename}.prodigal-list.txt", "rt") as fp:
@@ -217,7 +216,7 @@ rule gzip_prodigal_proteins:
 
 rule unique_kmers_protein:
     # need to use checkpoint here to make sure we get the updated proteome location
-    input: fasta=Checkpoint_MakePattern("{fastafile}")
+    input: fasta=ancient(Checkpoint_MakePattern("{fastafile}"))
     output:
         f"{out_dir}/count-kmers/{{acc}}.protein-k{{ksize}}.unique-kmers.txt"
     log: f"{logs_dir}/unique_kmers/{{acc}}.protein-k{{ksize}}.log"
@@ -229,7 +228,7 @@ rule unique_kmers_protein:
 
 rule unique_kmers_nucleotide:
     input: 
-        fasta=lambda w: tax_info.at[w.acc, "genome_fastafile"]
+        fasta=ancient(lambda w: tax_info.at[w.acc, "genome_fastafile"])
     output:
         f"{out_dir}/count-kmers/{{acc}}.nucleotide-k{{ksize}}.unique-kmers.txt"
     log: f"{logs_dir}/unique_kmers/{{acc}}.nucleotide-k{{ksize}}.log"
@@ -281,7 +280,7 @@ rule make_protein_bloom_filter_script:
     #conda: "conf/envs/bf.yml"
     shell:
         """
-        python protein-bf.py {input} --output {output} -k {wildcards.ksize} --alphabet protein 2> {log}
+        python sourmash-nodegraph.py {input} --output {output} -k {wildcards.ksize} --alphabet protein 2> {log}
         """
 
 rule make_nucl_bloom_filter_script:
@@ -295,5 +294,5 @@ rule make_nucl_bloom_filter_script:
     #conda: "conf/envs/bf.yml"
     shell:
         """
-        python protein-bf.py {input} --output {output} -k {wildcards.ksize} --alphabet nucleotide 2> {log}
+        python sourmash-nodegraph.py {input} --output {output} -k {wildcards.ksize} --alphabet nucleotide 2> {log}
         """

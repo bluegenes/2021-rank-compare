@@ -1,15 +1,14 @@
 # location for all generated files
 basename: gtdb
-release: 202
 
-output_dir: output.gtdb
+output_dir: genbank
 
 taxonomy_csv: gtdb-rs202.taxonomy.with-repinfo.csv 
 
 run_alphabets:
   #- nucleotide
   - protein
-  - dayhoff
+  #- dayhoff
 
 
 alphabet_info:
