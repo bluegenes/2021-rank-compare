@@ -1,8 +1,6 @@
 import csv
 import pandas as pd
 
-#configfile: "conf/gtdb-r202.yml"
-configfile: "conf/R_gnavus.yml"
 taxinfo = config['taxonomy_csv']
 taxfile_with_fastainfo = 'genbank/' + os.path.basename(taxinfo).rsplit('.csv')[0] + '.with-fastainfo.csv'
 tax_info = pd.read_csv(config['taxonomy_csv'], header=0)
@@ -23,6 +21,8 @@ out_dir = config['output_dir']
 class Checkpoint_MakePattern:
     def __init__(self, pattern):
         self.pattern = pattern
+        # to do -- check if this actually works, or it's just being done in __call__
+        self.prot_fastafiles=self.update_fapaths()
 
     def update_fapaths(self, basename=basename, acc=None, ksize=None):
         with open(f"genbank/{basename}.prodigal-list.txt", "rt") as fp:
@@ -32,9 +32,9 @@ class Checkpoint_MakePattern:
                 tax_info.at[accession, "protein_fastafile"] = f"{prodigal_dir}/{accession}_protein.faa.gz"
             # write fastapaths to file
             tax_info.to_csv(taxfile_with_fastainfo)
-            
+
             return tax_info["protein_fastafile"]
-    
+
     def find_protein_fasta(self, acc=None, ksize=None, alphabet=None):
         if acc:
             return tax_info.at[acc, "protein_fastafile"]
@@ -45,13 +45,16 @@ class Checkpoint_MakePattern:
         # wait for the results of 'check_proteins'; this will trigger an
         # exception until that rule has been run.
         checkpoints.check_proteins.get(**w)
-        prot_fastafiles = self.update_fapaths()
+        if self.prot_fastafiles is None:
+            self.prot_fastafiles = self.update_fapaths()
+
+        # single fasta instead
         single_fasta = self.find_protein_fasta(**w)
         if single_fasta:
-            prot_fastafiles = single_fasta
-        pattern = expand(self.pattern, fastafile=prot_fastafiles, **w)
+            pattern = expand(self.pattern, fastafile=single_fasta, **w)
+        else:
+            pattern = expand(self.pattern, fastafile=self.prot_fastafiles, **w)
         return pattern
-
 
 # check params are in the right format, build alpha-ksize combos
 alpha_ksizes=[]
@@ -84,7 +87,6 @@ rule all:
         expand(f"{out_dir}/count-kmers/{{acc}}.nucleotide-k{{ksize}}.unique-kmers.txt", acc=ACCS, ksize = nucl_ksizes),
         expand(f"{out_dir}/count-kmers/{{acc}}.protein-k{{ksize}}.unique-kmers.txt", acc=ACCS, ksize = prot_ksizes),
         f"genbank/kmer-counts.csv",
-        #expand(f"{out_dir}/{basename}.{{alphak}}.nodegraph", alphak=alpha_ksizes),
         expand(f"{out_dir}/script-nodegraphs/{basename}.{{alphak}}.nodegraph",alphak=alpha_ksizes),
         #expand("genbank/genomes/{acc}_genomic.fna.gz", acc=ACCS),
         #expand("genbank/proteomes/{acc}_protein.faa.gz", acc=ACCS)
@@ -267,26 +269,12 @@ rule aggregate_unique_kmer_info:
         df = pd.DataFrame.from_dict(kcount, orient="index")
         df.to_csv(str(output), index_label='accession')
 
-rule make_bloom_filter_cmdline:
-    #how do I make a bigger tablesize!??
-    input: fasta=Checkpoint_MakePattern("{fastafile}")
-    output: f"{out_dir}/{basename}.{{alphabet}}-k{{ksize}}.nodegraph"
-    log: f"{logs_dir}/nodegraph/{basename}.{{alphabet}}-k{{ksize}}.log"
-    threads: 10
-    params:
-        cmd_mem=1e9, #bc conversion...!?
-    resources:
-        mem=100000,
-    conda: "conf/envs/khmer-env.yml"
-    shell:
-        """
-        load-graph.py -k {wildcards.ksize} -T {threads} -M {params.cmd_mem} {output} {input} 2> {log}
-        """
 
 rule make_protein_bloom_filter_script:
     input: fasta=Checkpoint_MakePattern("{fastafile}")
     output: f"{out_dir}/script-nodegraphs/{basename}.protein-k{{ksize}}.nodegraph"
     log: f"{logs_dir}/script-nodegraphs/{basename}.protein-k{{ksize}}.log"
+    benchmark: f"{logs_dir}/script-nodegraphs/{basename}.protein-k{{ksize}}.benchmark"
     threads: 10
     resources:
         mem=100000,
@@ -300,6 +288,7 @@ rule make_nucl_bloom_filter_script:
     input: expand("genbank/genomes/{acc}_genomic.fna.gz", acc=ACCS),
     output: f"{out_dir}/script-nodegraphs/{basename}.nucleotide-k{{ksize}}.nodegraph"
     log: f"{logs_dir}/script-nodegraphs/{basename}.nucleotide-k{{ksize}}.log"
+    benchmark: f"{logs_dir}/script-nodegraphs/{basename}.nucleotide-k{{ksize}}.benchmark"
     threads: 10
     resources:
         mem=100000,
