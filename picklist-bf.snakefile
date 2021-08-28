@@ -32,7 +32,7 @@ class Checkpoint_MakePattern:
             # write fastapaths to file
             tax_info.to_csv(taxfile_with_fastainfo)
 
-            return tax_info["protein_fastafile"]
+            return tax_info["protein_fastafile"], tax_info
 
     def find_protein_fasta(self, acc=None, ksize=None, alphabet=None):
         if acc:
@@ -40,12 +40,13 @@ class Checkpoint_MakePattern:
 
     def __call__(self, w):
         global checkpoints
+        global updated_taxD
 
         # wait for the results of 'check_proteins'; this will trigger an
         # exception until that rule has been run.
         checkpoints.check_proteins.get(**w)
         if self.prot_fastafiles is None:
-            self.prot_fastafiles = self.update_fapaths()
+            self.prot_fastafiles, updated_taxD = self.update_fapaths()
 
         # single fasta instead
         single_fasta = self.find_protein_fasta(**w)
@@ -172,7 +173,7 @@ localrules: check_proteins
 checkpoint check_proteins:
     input:
         f"genbank/{basename}.prodigal-list.txt"
-    output: temp(touch(f"genbank/.{basename}.check_proteins"))
+    output: touch(f"genbank/.{basename}.check_proteins")
 
 
 rule unzip_genome_for_prodigal:
@@ -269,30 +270,34 @@ rule aggregate_unique_kmer_info:
         df.to_csv(str(output), index_label='accession')
 
 
-rule make_protein_bloom_filter_script:
-    input: fasta=Checkpoint_MakePattern("{fastafile}")
+#rule write_fasta_csv:
+#    input: fasta=ancient(Checkpoint_MakePattern("{fastafile}"))
+#    output: taxfile_with_fastainfo
+
+
+# read new fastas from file instead of getting each time?
+rule make_sourmash_nodegraph_protein:
+    input: fasta=ancient(Checkpoint_MakePattern("{fastafile}"))
     output: f"{out_dir}/script-nodegraphs/{basename}.protein-k{{ksize}}.nodegraph"
     log: f"{logs_dir}/script-nodegraphs/{basename}.protein-k{{ksize}}.log"
     benchmark: f"{logs_dir}/script-nodegraphs/{basename}.protein-k{{ksize}}.benchmark"
     threads: 10
     resources:
         mem=100000,
-    #conda: "conf/envs/bf.yml"
     shell:
         """
-        python sourmash-nodegraph.py {input} --output {output} -k {wildcards.ksize} --alphabet protein 2> {log}
+        python sourmash-nodegraph.py {input} --output {output} -k {wildcards.ksize} --alphabet protein --tablesize 1e12 2> {log}
         """
 
-rule make_nucl_bloom_filter_script:
-    input: expand("genbank/genomes/{acc}_genomic.fna.gz", acc=ACCS),
+rule make_sourmash_nodegraph_nucl:
+    input: ancient(expand("genbank/genomes/{acc}_genomic.fna.gz", acc=ACCS)),
     output: f"{out_dir}/script-nodegraphs/{basename}.nucleotide-k{{ksize}}.nodegraph"
     log: f"{logs_dir}/script-nodegraphs/{basename}.nucleotide-k{{ksize}}.log"
     benchmark: f"{logs_dir}/script-nodegraphs/{basename}.nucleotide-k{{ksize}}.benchmark"
     threads: 10
     resources:
         mem=100000,
-    #conda: "conf/envs/bf.yml"
     shell:
         """
-        python sourmash-nodegraph.py {input} --output {output} -k {wildcards.ksize} --alphabet nucleotide 2> {log}
+        python sourmash-nodegraph.py {input} --output {output} -k {wildcards.ksize} --alphabet nucleotide --tablesize 1e12 2> {log}
         """

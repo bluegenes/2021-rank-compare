@@ -30,6 +30,9 @@ def main(args):
     is_protein=True
     is_dayhoff=False
     is_hp=False
+
+    tablesize = int(args.tablesize)
+
     alphabet = args.alphabet
     if alphabet in ['dna', 'rna', 'nucleotide']:
         is_protein=False
@@ -39,7 +42,7 @@ def main(args):
         is_hp = True
 
     # init bf
-    bloom_filter = Nodegraph(args.ksize, args.tablesize, args.n_tables)
+    bloom_filter = Nodegraph(args.ksize, tablesize, args.n_tables)
     mh = sourmash.MinHash(n=0, ksize=args.ksize, scaled=1, is_protein=is_protein, dayhoff=is_dayhoff, hp=is_hp)
     for fasta in args.input_files:
         records = screed_open_fasta(fasta, strict_mode=False)
@@ -74,7 +77,7 @@ def cmdline(sys_args):
     p.add_argument("input_files", nargs='+')
     p.add_argument("-k", "--ksize",  type=int)
     p.add_argument("--alphabet")
-    p.add_argument("--n_tables", default=DEFAULT_N_TABLES)
+    p.add_argument("--n_tables", type=int, default=DEFAULT_N_TABLES)
     p.add_argument("--tablesize", default=DEFAULT_MAX_TABLESIZE)
     p.add_argument("--max_false_pos", default=DEFAULT_MAX_FALSE_POS)
     p.add_argument("--output")
