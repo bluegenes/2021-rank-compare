@@ -179,7 +179,6 @@ checkpoint check_proteins:
 rule unzip_genome_for_prodigal:
     input:
         fasta="genbank/genomes/{acc}_genomic.fna.gz",
-        checkpt=f"genbank/.{basename}.check_proteins",
     output:
         unzipped=temp("genbank/genomes/{acc}_genomic.fna"),
     log: os.path.join(logs_dir, "gzip", "{acc}.genome_unzip.log")
@@ -192,7 +191,6 @@ rule unzip_genome_for_prodigal:
 rule prodigal_genomes_for_failed_protein_downloads:
     input:
         fasta="genbank/genomes/{acc}_genomic.fna",
-        checkpt=f"genbank/.{basename}.check_proteins",
     output:
         proteins=f"{prodigal_dir}/{{acc}}_protein.faa",
         genes=f"{prodigal_dir}/{{acc}}_genes.fna"

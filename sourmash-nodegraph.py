@@ -31,7 +31,7 @@ def main(args):
     is_dayhoff=False
     is_hp=False
 
-    tablesize = int(args.tablesize)
+    tablesize = int(float(args.tablesize))
 
     alphabet = args.alphabet
     if alphabet in ['dna', 'rna', 'nucleotide']:
