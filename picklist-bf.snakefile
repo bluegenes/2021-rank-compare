@@ -70,7 +70,7 @@ for alpha, info in config["alphabet_info"].items():
     # build a parameter for the right combinations
     #config["alphabet_info"][alpha]["select_params"] = expand("{alpha}-k{ksize}-scaled{scaled}", alpha=alpha, scaled=scaled, ksize=ksize)
     #these_alpha_ksize = expand("{alpha}-k{{ksize}}", ksize = ksize)
-    if alpha in ['nucleotide', 'protein']:
+    if alpha in ['protein']: #['nucleotide', 'protein']:
         alpha_ksizes += expand(f"{alpha}-k{{ksize}}", ksize = ksize)
 
 # some easier vars
@@ -82,12 +82,13 @@ print(alpha_ksizes)
 
 rule all:
     input:
-        Checkpoint_MakePattern("{fastafile}"),
-        ancient(expand("genbank/genomes/{acc}_genomic.fna.gz", acc=ACCS)),
-        expand(f"{out_dir}/count-kmers/{{acc}}.nucleotide-k{{ksize}}.unique-kmers.txt", acc=ACCS, ksize = nucl_ksizes),
-        expand(f"{out_dir}/count-kmers/{{acc}}.protein-k{{ksize}}.unique-kmers.txt", acc=ACCS, ksize = prot_ksizes),
-        f"genbank/kmer-counts.csv",
-        expand(f"{out_dir}/script-nodegraphs/{basename}.{{alphak}}.nodegraph",alphak=alpha_ksizes),
+     #   Checkpoint_MakePattern("{fastafile}"),
+     #   ancient(expand("genbank/genomes/{acc}_genomic.fna.gz", acc=ACCS)),
+     #   expand(f"{out_dir}/count-kmers/{{acc}}.nucleotide-k{{ksize}}.unique-kmers.txt", acc=ACCS, ksize = nucl_ksizes),
+        #expand(f"{out_dir}/count-kmers/{{acc}}.protein-k{{ksize}}.unique-kmers.txt", acc=ACCS, ksize = prot_ksizes),
+        #f"genbank/kmer-counts.csv",
+        #expand(f"{out_dir}/sourmash-nodegraph/{basename}.{{alphak}}.nodegraph",alphak=alpha_ksizes),
+        expand(f"{out_dir}/smaller-sourmash-nodegraph/{basename}.{{alphak}}.nodegraph",alphak=alpha_ksizes),
         #expand("genbank/genomes/{acc}_genomic.fna.gz", acc=ACCS),
         #expand("genbank/proteomes/{acc}_protein.faa.gz", acc=ACCS)
 
@@ -276,23 +277,23 @@ rule aggregate_unique_kmer_info:
 # read new fastas from file instead of getting each time?
 rule make_sourmash_nodegraph_protein:
     input: fasta=ancient(Checkpoint_MakePattern("{fastafile}"))
-    output: f"{out_dir}/script-nodegraphs/{basename}.protein-k{{ksize}}.nodegraph"
-    log: f"{logs_dir}/script-nodegraphs/{basename}.protein-k{{ksize}}.log"
-    benchmark: f"{logs_dir}/script-nodegraphs/{basename}.protein-k{{ksize}}.benchmark"
-    threads: 10
+    output: f"{out_dir}/smaller-sourmash-nodegraph/{basename}.protein-k{{ksize}}.nodegraph"
+    log: f"{logs_dir}/smaller-sourmash-nodegraph/{basename}.protein-k{{ksize}}.log"
+    benchmark: f"{logs_dir}/sourmash-nodegraph/{basename}.protein-k{{ksize}}.benchmark"
+    threads: 1
     resources:
         mem=100000,
     shell:
         """
-        python sourmash-nodegraph.py {input} --output {output} -k {wildcards.ksize} --alphabet protein --tablesize 1e12 2> {log}
+        python sourmash-nodegraph.py {input} --output {output} -k {wildcards.ksize} --alphabet protein --tablesize 1e9 2> {log}
         """
 
 rule make_sourmash_nodegraph_nucl:
     input: ancient(expand("genbank/genomes/{acc}_genomic.fna.gz", acc=ACCS)),
-    output: f"{out_dir}/script-nodegraphs/{basename}.nucleotide-k{{ksize}}.nodegraph"
-    log: f"{logs_dir}/script-nodegraphs/{basename}.nucleotide-k{{ksize}}.log"
-    benchmark: f"{logs_dir}/script-nodegraphs/{basename}.nucleotide-k{{ksize}}.benchmark"
-    threads: 10
+    output: f"{out_dir}/sourmash-nodegraph/{basename}.nucleotide-k{{ksize}}.nodegraph"
+    log: f"{logs_dir}/sourmash-nodegraph/{basename}.nucleotide-k{{ksize}}.log"
+    benchmark: f"{logs_dir}/sourmash-nodegraph/{basename}.nucleotide-k{{ksize}}.benchmark"
+    threads: 1
     resources:
         mem=100000,
     shell:

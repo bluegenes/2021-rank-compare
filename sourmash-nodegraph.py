@@ -44,9 +44,9 @@ def main(args):
     # init bf
     bloom_filter = Nodegraph(args.ksize, tablesize, args.n_tables)
     mh = sourmash.MinHash(n=0, ksize=args.ksize, scaled=1, is_protein=is_protein, dayhoff=is_dayhoff, hp=is_hp)
-    for fasta in args.input_files:
+    for n, fasta in enumerate(args.input_files):
         records = screed_open_fasta(fasta, strict_mode=False)
-        for record in records:
+        for x, record in enumerate(records):
             if "*" in record.sequence:
                 continue
             if is_protein:
@@ -62,9 +62,12 @@ def main(args):
             # upd after each seq? Or build mh of entire file, then update?
             bloom_filter.update(mh)
             mh.clear()
+        sys.stderr.write(f"Processed {x} records in {n}th fasta file\n")
 
-    # calculate expected collisions
-    bf_info = calc_expected_collisions(bloom_filter, force=True, max_false_pos=args.max_false_pos)
+    # check expected collisions
+    expected_collisions = bloom_filter.expected_collisions
+    sys.stderr.write(f"Expected collisions: {expected_collisions}")
+    calc_expected_collisions(bloom_filter, force=True, max_false_pos=args.max_false_pos)
 
     bloom_filter.save(args.output)
 
