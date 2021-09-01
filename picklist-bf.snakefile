@@ -88,7 +88,7 @@ rule all:
         #expand(f"{out_dir}/count-kmers/{{acc}}.protein-k{{ksize}}.unique-kmers.txt", acc=ACCS, ksize = prot_ksizes),
         #f"genbank/kmer-counts.csv",
         #expand(f"{out_dir}/sourmash-nodegraph/{basename}.{{alphak}}.nodegraph",alphak=alpha_ksizes),
-        expand(f"{out_dir}/smaller-sourmash-nodegraph/{basename}.{{alphak}}.nodegraph",alphak=alpha_ksizes),
+        expand(f"{out_dir}/sourmash-nodegraph/{basename}.{{alphak}}.nodegraph",alphak=alpha_ksizes),
         #expand("genbank/genomes/{acc}_genomic.fna.gz", acc=ACCS),
         #expand("genbank/proteomes/{acc}_protein.faa.gz", acc=ACCS)
 
@@ -277,15 +277,15 @@ rule aggregate_unique_kmer_info:
 # read new fastas from file instead of getting each time?
 rule make_sourmash_nodegraph_protein:
     input: fasta=ancient(Checkpoint_MakePattern("{fastafile}"))
-    output: f"{out_dir}/smaller-sourmash-nodegraph/{basename}.protein-k{{ksize}}.nodegraph"
-    log: f"{logs_dir}/smaller-sourmash-nodegraph/{basename}.protein-k{{ksize}}.log"
+    output: f"{out_dir}/sourmash-nodegraph/{basename}.protein-k{{ksize}}.nodegraph"
+    log: f"{logs_dir}/sourmash-nodegraph/{basename}.protein-k{{ksize}}.log"
     benchmark: f"{logs_dir}/sourmash-nodegraph/{basename}.protein-k{{ksize}}.benchmark"
     threads: 1
     resources:
-        mem=100000,
+        mem=200000,
     shell:
         """
-        python sourmash-nodegraph.py {input} --output {output} -k {wildcards.ksize} --alphabet protein --tablesize 1e9 2> {log}
+        python sourmash-nodegraph.py {input} --output {output} -k {wildcards.ksize} --alphabet protein --tablesize 1e11 2> {log}
         """
 
 rule make_sourmash_nodegraph_nucl:
