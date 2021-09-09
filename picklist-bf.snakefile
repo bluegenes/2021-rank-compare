@@ -70,7 +70,7 @@ for alpha, info in config["alphabet_info"].items():
     # build a parameter for the right combinations
     #config["alphabet_info"][alpha]["select_params"] = expand("{alpha}-k{ksize}-scaled{scaled}", alpha=alpha, scaled=scaled, ksize=ksize)
     #these_alpha_ksize = expand("{alpha}-k{{ksize}}", ksize = ksize)
-    if alpha in ['protein']: #['nucleotide', 'protein']:
+    if alpha in ['protein', 'dayhoff']: #['nucleotide', 'protein']:
         alpha_ksizes += expand(f"{alpha}-k{{ksize}}", ksize = ksize)
 
 # some easier vars
@@ -88,9 +88,9 @@ rule all:
         #expand(f"{out_dir}/count-kmers/{{acc}}.protein-k{{ksize}}.unique-kmers.txt", acc=ACCS, ksize = prot_ksizes),
         #f"genbank/kmer-counts.csv",
         #expand(f"{out_dir}/sourmash-nodegraph/{basename}.{{alphak}}.nodegraph",alphak=alpha_ksizes),
-        expand(f"{out_dir}/sourmash-nodegraph/{basename}.{{alphak}}.nodegraph",alphak=alpha_ksizes),
         #expand("genbank/genomes/{acc}_genomic.fna.gz", acc=ACCS),
-        #expand("genbank/proteomes/{acc}_protein.faa.gz", acc=ACCS)
+        expand("genbank/proteomes/{acc}_protein.faa.gz", acc=ACCS)
+        #expand(f"{out_dir}/sourmash-nodegraph/{basename}.{{alphak}}.nodegraph",alphak=alpha_ksizes),
 
 # download genbank genome details; make an info.csv file for entry.
 rule make_genome_info_csv:
@@ -285,7 +285,20 @@ rule make_sourmash_nodegraph_protein:
         mem=200000,
     shell:
         """
-        python sourmash-nodegraph.py {input} --output {output} -k {wildcards.ksize} --alphabet protein --tablesize 1e11 2> {log}
+        python sourmash-nodegraph.py {input} --output {output} -k {wildcards.ksize} --alphabet protein --tablesize 1e10 2> {log}
+        """
+
+rule make_sourmash_nodegraph_dayhoff:
+    input: fasta=ancient(Checkpoint_MakePattern("{fastafile}"))
+    output: f"{out_dir}/sourmash-nodegraph/{basename}.dayhoff-k{{ksize}}.nodegraph"
+    log: f"{logs_dir}/sourmash-nodegraph/{basename}.dayhoff-k{{ksize}}.log"
+    benchmark: f"{logs_dir}/sourmash-nodegraph/{basename}.dayhoff-k{{ksize}}.benchmark"
+    threads: 1
+    resources:
+        mem=200000,
+    shell:
+        """
+        python sourmash-nodegraph.py {input} --output {output} -k {wildcards.ksize} --alphabet dayhoff --tablesize 1e10 2> {log}
         """
 
 rule make_sourmash_nodegraph_nucl:
