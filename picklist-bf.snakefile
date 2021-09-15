@@ -70,7 +70,7 @@ for alpha, info in config["alphabet_info"].items():
     # build a parameter for the right combinations
     #config["alphabet_info"][alpha]["select_params"] = expand("{alpha}-k{ksize}-scaled{scaled}", alpha=alpha, scaled=scaled, ksize=ksize)
     #these_alpha_ksize = expand("{alpha}-k{{ksize}}", ksize = ksize)
-    if alpha in ['protein', 'dayhoff']: #['nucleotide', 'protein']:
+    if alpha in ['protein']:#, 'dayhoff']: #['nucleotide', 'protein']:
         alpha_ksizes += expand(f"{alpha}-k{{ksize}}", ksize = ksize)
 
 # some easier vars
@@ -89,8 +89,10 @@ rule all:
         #f"genbank/kmer-counts.csv",
         #expand(f"{out_dir}/sourmash-nodegraph/{basename}.{{alphak}}.nodegraph",alphak=alpha_ksizes),
         #expand("genbank/genomes/{acc}_genomic.fna.gz", acc=ACCS),
-        expand("genbank/proteomes/{acc}_protein.faa.gz", acc=ACCS)
+        #expand("genbank/proteomes/{acc}_protein.faa.gz", acc=ACCS)
         #expand(f"{out_dir}/sourmash-nodegraph/{basename}.{{alphak}}.nodegraph",alphak=alpha_ksizes),
+        expand(f"{out_dir}/unique-kmers/{basename}.{{alphak}}.unique-kmers.txt",alphak=alpha_ksizes),
+        expand(f"{out_dir}/count-unique-kmers/{basename}.{{alphak}}.unique-kmers.txt", alphak=alpha_ksizes)
 
 # download genbank genome details; make an info.csv file for entry.
 rule make_genome_info_csv:
@@ -214,6 +216,54 @@ rule gzip_prodigal_proteins:
         gzip -c {input} > {output} 2> {log}
         """
 
+
+rule write_protein_fastalist: 
+    # need to use checkpoint here to make sure we get the updated proteome location
+    input: fasta=ancient(Checkpoint_MakePattern("{fastafile}"))
+    output:
+        f"{out_dir}/fastalists/{basename}.protein.fastalist.txt"
+    log: f"{logs_dir}/write-protein-fastalist/{basename}.protein.log"
+    run:
+        with open(str(output), "w") as out:
+            for inF in input:
+                fasta_file = str(inF)
+                out.write(f"{fasta_file}\n")
+
+
+rule picklist_count_kmers:
+    # need to use checkpoint here to make sure we get the updated proteome location
+    input:  f"{out_dir}/fastalists/{basename}.protein.fastalist.txt" 
+    output: 
+        num_unique=f"{out_dir}/count-unique-kmers/{basename}.{{alphabet}}-k{{ksize}}.unique-kmers.txt",
+        kmer_counts=f"{out_dir}/kmer-counts/{basename}.{{alphabet}}-k{{ksize}}.kmer-counts.txt",
+    params:
+        basename = basename,
+    log: f"{logs_dir}/count-kmers/{basename}.{{alphabet}}-k{{ksize}}.log"
+    shell:
+        """
+        python picklist-shared-kmers.py {input} \
+          --basename {params.basename} \
+          --alphabet {wildcards.alphabet} \
+          --ksize {wildcards.ksize} \
+          --output-num-unique {output.num_unique} \
+          --output-kmer-counts {output.kmer_counts} 2> {log}
+        """
+
+
+#rule write_nucleotide_fastalist: 
+#    # need to use checkpoint here to make sure we get the updated proteome location
+#    input: fasta=ancient(lambda w: tax_info.at[w.acc, "genome_fastafile"]) 
+#    output:
+#        f"{out_dir}/fastalists/{{acc}}.nucl.fastalist.txt"
+#    log: f"{logs_dir}/write-nucl-fastalist/{{acc}}.protein.log"
+#    run:
+#        with open(str(output), "w") as out:
+#            for inF in input:
+#                fasta_file = str(inF)
+#                out.write(f"{fasta_file}\n")
+
+
+# this is for each individual genome/proteome
 rule unique_kmers_protein:
     # need to use checkpoint here to make sure we get the updated proteome location
     input: fasta=ancient(Checkpoint_MakePattern("{fastafile}"))
@@ -225,6 +275,7 @@ rule unique_kmers_protein:
         """
         unique-kmers.py -k {wildcards.ksize} -e 0.005 {input.fasta} --report {output}
         """
+
 
 rule unique_kmers_nucleotide:
     input: 
@@ -269,10 +320,22 @@ rule aggregate_unique_kmer_info:
         df.to_csv(str(output), index_label='accession')
 
 
+### this will probably not work with _all_the 250k genomes -- will run out of room on the command line
+rule picklist_unique_kmers_protein_khmer:
+    # need to use checkpoint here to make sure we get the updated proteome location
+    input: fasta=ancient(Checkpoint_MakePattern("{fastafile}"))
+    output: f"{out_dir}/unique-kmers/{basename}.protein-k{{ksize}}.unique-kmers.txt"
+    log: f"{logs_dir}/unique_kmers/{basename}.protein-k{{ksize}}.log"
+    conda: "conf/envs/khmer-env.yml"
+    shell:
+        """
+        unique-kmers.py -k {wildcards.ksize} -e 0.005 {input.fasta} --report {output}
+        """
+
+
 #rule write_fasta_csv:
 #    input: fasta=ancient(Checkpoint_MakePattern("{fastafile}"))
 #    output: taxfile_with_fastainfo
-
 
 # read new fastas from file instead of getting each time?
 rule make_sourmash_nodegraph_protein:
@@ -285,7 +348,7 @@ rule make_sourmash_nodegraph_protein:
         mem=200000,
     shell:
         """
-        python sourmash-nodegraph.py {input} --output {output} -k {wildcards.ksize} --alphabet protein --tablesize 1e10 2> {log}
+        python sourmash-nodegraph.py {input} --output {output} -k {wildcards.ksize} --alphabet protein --tablesize 1e12 2> {log}
         """
 
 rule make_sourmash_nodegraph_dayhoff:
