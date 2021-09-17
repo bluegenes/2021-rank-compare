@@ -87,7 +87,7 @@ def main(args):
                 rank = ""
                 lin = lineage
             else:
-                rank = lineage[0].rank
+                rank = lineage[-1].rank
                 lin = lca_utils.display_lineage(lineage)
             f_unique = float(count)/total_kmer_counts
             ll_csv.writerow([rank, lin, str(count), str(f_unique)])
