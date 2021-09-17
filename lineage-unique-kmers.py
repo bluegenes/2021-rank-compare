@@ -84,7 +84,7 @@ def main(args):
 
         for(lineage, count) in sorted_lcaD:
             if lineage == "no_lca":
-                rank = ""
+                rank = "no_rank"
                 lin = lineage
             else:
                 rank = lineage[-1].rank
