@@ -70,7 +70,7 @@ for alpha, info in config["alphabet_info"].items():
     # build a parameter for the right combinations
     #config["alphabet_info"][alpha]["select_params"] = expand("{alpha}-k{ksize}-scaled{scaled}", alpha=alpha, scaled=scaled, ksize=ksize)
     #these_alpha_ksize = expand("{alpha}-k{{ksize}}", ksize = ksize)
-    if alpha in ['protein']:#, 'dayhoff']: #['nucleotide', 'protein']:
+    if alpha in ['protein']: #['nucleotide']: #['protein']:#, 'dayhoff']: #['nucleotide', 'protein']:
         alpha_ksizes += expand(f"{alpha}-k{{ksize}}", ksize = ksize)
 
 # some easier vars
@@ -90,9 +90,9 @@ rule all:
         #expand(f"{out_dir}/sourmash-nodegraph/{basename}.{{alphak}}.nodegraph",alphak=alpha_ksizes),
         #expand("genbank/genomes/{acc}_genomic.fna.gz", acc=ACCS),
         #expand("genbank/proteomes/{acc}_protein.faa.gz", acc=ACCS)
-        #expand(f"{out_dir}/sourmash-nodegraph/{basename}.{{alphak}}.nodegraph",alphak=alpha_ksizes),
-        expand(f"{out_dir}/unique-kmers/{basename}.{{alphak}}.unique-kmers.txt",alphak=alpha_ksizes),
-        expand(f"{out_dir}/count-unique-kmers/{basename}.{{alphak}}.unique-kmers.txt", alphak=alpha_ksizes)
+        expand(f"{out_dir}/sourmash-nodegraph/{basename}.{{alphak}}.nodegraph",alphak=alpha_ksizes),
+        #expand(f"{out_dir}/unique-kmers/{basename}.{{alphak}}.unique-kmers.txt",alphak=alpha_ksizes),
+        #expand(f"{out_dir}/count-unique-kmers/{basename}.{{alphak}}.unique-kmers.txt", alphak=alpha_ksizes)
 
 # download genbank genome details; make an info.csv file for entry.
 rule make_genome_info_csv:
@@ -230,24 +230,25 @@ rule write_protein_fastalist:
                 out.write(f"{fasta_file}\n")
 
 
-rule picklist_count_kmers:
-    # need to use checkpoint here to make sure we get the updated proteome location
-    input:  f"{out_dir}/fastalists/{basename}.protein.fastalist.txt" 
-    output: 
-        num_unique=f"{out_dir}/count-unique-kmers/{basename}.{{alphabet}}-k{{ksize}}.unique-kmers.txt",
-        kmer_counts=f"{out_dir}/kmer-counts/{basename}.{{alphabet}}-k{{ksize}}.kmer-counts.txt",
-    params:
-        basename = basename,
-    log: f"{logs_dir}/count-kmers/{basename}.{{alphabet}}-k{{ksize}}.log"
-    shell:
-        """
-        python picklist-shared-kmers.py {input} \
-          --basename {params.basename} \
-          --alphabet {wildcards.alphabet} \
-          --ksize {wildcards.ksize} \
-          --output-num-unique {output.num_unique} \
-          --output-kmer-counts {output.kmer_counts} 2> {log}
-        """
+#rule picklist_count_kmers:
+#    # need to use checkpoint here to make sure we get the updated proteome location
+#    input:  f"{out_dir}/fastalists/{basename}.protein.fastalist.txt" 
+#    output: 
+#        num_unique=f"{out_dir}/count-unique-kmers/{basename}.{{alphabet}}-k{{ksize}}.unique-kmers.txt",
+#        fasta_nunique=f"{out_dir}/kmer-counts/{basename}.{{alphabet}}-k{{ksize}}.kmer-counts.txt",
+#    params:
+#        basename = basename,
+#    log: f"{logs_dir}/count-kmers/{basename}.{{alphabet}}-k{{ksize}}.log"
+#    shell:
+#        #python picklist-shared-kmers.py {input} \
+#        """
+#        python hll-count-kmers.py {input} \
+#          --basename {params.basename} \
+#          --alphabet {wildcards.alphabet} \
+#          --ksize {wildcards.ksize} \
+#          --output-num-unique {output.num_unique} \
+#          --output-fasta-nunique {output.fasta_nunique} 2> {log}
+#        """
 
 
 #rule write_nucleotide_fastalist: 
@@ -339,16 +340,17 @@ rule picklist_unique_kmers_protein_khmer:
 
 # read new fastas from file instead of getting each time?
 rule make_sourmash_nodegraph_protein:
-    input: fasta=ancient(Checkpoint_MakePattern("{fastafile}"))
+#    input: fasta=ancient(Checkpoint_MakePattern("{fastafile}"))
+    input: f"{out_dir}/fastalists/{basename}.protein.fastalist.txt"
     output: f"{out_dir}/sourmash-nodegraph/{basename}.protein-k{{ksize}}.nodegraph"
     log: f"{logs_dir}/sourmash-nodegraph/{basename}.protein-k{{ksize}}.log"
     benchmark: f"{logs_dir}/sourmash-nodegraph/{basename}.protein-k{{ksize}}.benchmark"
     threads: 1
     resources:
-        mem=200000,
+        mem=400000,
     shell:
         """
-        python sourmash-nodegraph.py {input} --output {output} -k {wildcards.ksize} --alphabet protein --tablesize 1e12 2> {log}
+        python sourmash-nodegraph.py --input-filelist {input} --output {output} -k {wildcards.ksize} --alphabet protein --tablesize 1e12 2> {log}
         """
 
 rule make_sourmash_nodegraph_dayhoff:

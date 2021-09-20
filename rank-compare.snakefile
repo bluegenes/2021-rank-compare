@@ -7,7 +7,7 @@ import pandas as pd
 from collections import defaultdict
 from sourmash.tax import tax_utils
 
-gtdb_taxonomy=config.get('gtdb_taxonomy', '/group/ctbrowngrp/gtdb/gtdb-rs202.taxonomy.v2.csv')
+gtdb_taxonomy=config.get('gtdb_taxonomy', '/group/ctbrowngrp/gtdb/gtdb-rs202.taxonomy.v2.with-strain.csv')
 
 #sample_info = pd.read_csv(config['sample_info'], sep = '\t')
 #sample_column = config.get('sample_colname', 'Genome')
@@ -32,6 +32,7 @@ rank_taxinfo = []
 # make list of output bloom filter basenames
 for rank in tax_utils.ascending_taxlist(include_strain=False):
     rank_taxonomies = taxDF[rank].unique() # unique taxa at each rank
+    rank_taxonomies = [x.replace(' ', '_') for x in rank_taxonomies]
     taxonomyD[rank] = rank_taxonomies
     rank_tax = expand(os.path.join(rank, f'{basename}.{{taxon}}'), taxon = rank_taxonomies) 
     rank_taxinfo.extend(rank_tax)
@@ -51,14 +52,12 @@ for alpha, info in config["alphabet_info"].items():
     #if alpha in ['nucleotide', 'protein']:
     alpha_ksizes += expand(f"{alpha}-k{{ksize}}", ksize = ksize)
 
-
-
-
 rule all:
     input: 
 #        expand(os.path.join(out_dir, 'unroll-compare', '{rt}.{alphabet}-k{ksize}.csv'), rt=rank_taxinfo)
-         expand(os.path.join(out_dir, '{basename}-taxonomic-picklists', '{rt}.csv'), rt=rank_taxinfo, basename=basename),
-         expand(os.path.join(out_dir, 'bloom-filters', '{ranktaxinf}.{alphak}.nodegraph'), ranktaxinf=rank_taxinfo, alphak=alpha_ksizes)
+         expand(os.path.join(out_dir, f'{basename}-taxonomic-picklists', '{rt}.csv'), rt=rank_taxinfo),
+         expand(os.path.join(out_dir, 'shared-kmers', '{ranktaxinf}.{alphak}.shared-kmers.csv'), ranktaxinf=rank_taxinfo, alphak=alpha_ksizes),
+         #expand(os.path.join(out_dir, 'bloom-filters', '{ranktaxinf}.{alphak}.nodegraph'), ranktaxinf=rank_taxinfo, alphak=alpha_ksizes)
 
 
 rule make_picklists:
@@ -71,10 +70,41 @@ rule make_picklists:
     benchmark: os.path.join(logs_dir, "make_picklists", "{basename}.make_picklists.benchmark")
     shell:
         """
-        python gtdb-rs202-taxonomic-picklists --output-base {wildcards.basename} 
-                                              --output-dir {params.output_dir} 
-                                              --gtdb-taxonomy {input.gtdb_taxonomy}
-                                              2 > {log}
+        python make-gtdb-rank-picklists.py --output-base {wildcards.basename} \
+                                              --output-dir {params.output_dir} \
+                                              --gtdb-taxonomy {input} 2> {log}
+        """
+
+
+# use sourmash sig intersect to get k-mers shared by taxonomy group
+rule shared_kmers_picklist_intersect:
+    input: 
+        db=f"{database_dir}/gtdb-rs202.{{alphabet}}.k{{ksize}}.zip",
+        picklist=f"{out_dir}/{{basename}}-taxonomic-picklists/{{rank}}/{{basename}}.{{taxon}}.csv",
+    output: f"{out_dir}/shared-kmers/{{rank}}/{{basename}}.{{taxon}}.{{alphabet}}-k{{ksize}}.shared-kmers.sig"
+    params:
+        alpha= lambda w: f"--{w.alphabet}",
+    log: f"{logs_dir}/shared-kmers/{{rank}}/{{basename}}.{{taxon}}.{{alphabet}}-k{{ksize}}.shared-kmers.log"
+    benchmark: f"{logs_dir}/shared-kmers/{{rank}}/{{basename}}.{{taxon}}.{{alphabet}}-k{{ksize}}.shared-kmers.benchmark",
+    shell:
+        """
+        sourmash sig intersect {input.db} \
+                 --ksize {wildcards.ksize} {params.alpha} \
+                 --picklist {input.picklist} -o {output} 2> {log}
+        """
+
+# use sourmash sig intersect to get k-mers shared by taxonomy group
+rule describe_intersected_sig: 
+    input: rules.shared_kmers_picklist_intersect.output,
+    output: f"{out_dir}/shared-kmers/{{rank}}/{{basename}}.{{taxon}}.{{alphabet}}-k{{ksize}}.shared-kmers.csv"
+    params:
+        alpha= lambda w: f"--{w.alphabet}"
+    log: f"{logs_dir}/shared-kmers/{{rank}}/{{basename}}.{{taxon}}.{{alphabet}}-k{{ksize}}.describe.log"
+    benchmark: f"{logs_dir}/shared-kmers/{{rank}}/{{basename}}.{{taxon}}.{{alphabet}}-k{{ksize}}.describe.benchmark"
+    shell:
+        """
+        sourmash sig describe {input} --csv {output} \
+                 --ksize {wildcards.ksize} {params.alpha} 2> {log}
         """
 
 

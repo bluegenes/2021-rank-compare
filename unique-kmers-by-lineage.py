@@ -24,9 +24,12 @@ from sourmash.tax import tax_utils
 #    return ""
 
 def get_lca_lineage(lineages):
-    lin_tree = lca_utils.build_tree(lineages)
-    lca, node_count = lca_utils.find_lca(lin_tree)
-    return lca, node_count
+    if len(lineages) == 1: # no need to find lca - we already have it
+        return lineages.pop(), 1
+    else:
+        lin_tree = lca_utils.build_tree(lineages)
+        lca, node_count = lca_utils.find_lca(lin_tree)
+        return lca, node_count
 
 
 def hash2lin_from_LCA(dblist, min_num=2):
@@ -61,6 +64,7 @@ def make_lca_lineageD(hashD):
             # increment the count for this lineage in our LCA lineage counts dict
             lca_lineage_counts[lca_lineage] += 1
         else:
+            print('WARNING: no lca lineage!')
             lca_lineage_counts["no_lca"] += 1
 
     print(f"total unique hashes: {n}")
@@ -84,8 +88,8 @@ def main(args):
 
         for(lineage, count) in sorted_lcaD:
             if lineage == "no_lca":
-                rank = "no_rank"
-                lin = lineage
+                rank = "no_lca"
+                lin = "no_lin"
             else:
                 rank = lineage[-1].rank
                 lin = lca_utils.display_lineage(lineage)

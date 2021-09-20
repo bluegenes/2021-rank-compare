@@ -42,16 +42,12 @@ rule unique_kmers_lca:
     output: f"{out_dir}/lca-unique-kmers/{{basename}}.{{alphabet}}-k{{ksize}}.lca-unique-kmers.txt",
     params:
         lca_scaled = lambda w: lca_scaledD[w.alphabet]
-    log: os.path.join(logs_dir, "lca-unique-kmers", "{basename}.{{alphabet}}-k{{ksize}}.log" )
-    benchmark: os.path.join(logs_dir, "lca-unique-kmers", "{basename}.{{alphabet}}-k{{ksize}}.benchmark" )
+    log: os.path.join(logs_dir, "lca-unique-kmers", "{basename}.{alphabet}-k{ksize}.log" )
+    benchmark: os.path.join(logs_dir, "lca-unique-kmers", "{basename}.{alphabet}-k{ksize}.benchmark" )
     shell:
         """
         python unique-kmers-by-lineage.py --db {input} \
                --ksize {wildcards.ksize} --scaled {params.lca_scaled} \
                --output-csv {output} 2> {log}
         """
-
-#rule intersect_shared_kmers_picklist:
-#    input: "{database_dir}/gtdb-rs202.{alphabet}.k{ksize}.zip"
-#    output: "{}"
 
