@@ -41,10 +41,15 @@ def main(args):
     elif alphabet == "hp":
         is_hp = True
 
+    input_files = args.input_files
+    if args.input_filelist:
+        more_files = [x.strip() for x in open(args.input_filelist, 'r')]
+        input_files +=more_files
+
     # init bf
     bloom_filter = Nodegraph(args.ksize, tablesize, args.n_tables)
     mh = sourmash.MinHash(n=0, ksize=args.ksize, scaled=1, is_protein=is_protein, dayhoff=is_dayhoff, hp=is_hp)
-    for n, fasta in enumerate(args.input_files):
+    for n, fasta in enumerate(input_files):
         records = screed_open_fasta(fasta, strict_mode=False)
         for x, record in enumerate(records):
             if "*" in record.sequence:
@@ -77,7 +82,8 @@ def main(args):
 def cmdline(sys_args):
     "Command line entry point w/argparse action."
     p = argparse.ArgumentParser()
-    p.add_argument("input_files", nargs='+')
+    p.add_argument("input_files", nargs='*')
+    p.add_argument("--input-filelist")
     p.add_argument("-k", "--ksize",  type=int)
     p.add_argument("--alphabet")
     p.add_argument("--n_tables", type=int, default=DEFAULT_N_TABLES)
