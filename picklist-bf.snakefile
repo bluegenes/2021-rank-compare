@@ -347,7 +347,7 @@ rule make_sourmash_nodegraph_protein:
     benchmark: f"{logs_dir}/sourmash-nodegraph/{basename}.protein-k{{ksize}}.benchmark"
     threads: 1
     resources:
-        mem=400000,
+        mem=600000,
     shell:
         """
         python sourmash-nodegraph.py --input-filelist {input} --output {output} -k {wildcards.ksize} --alphabet protein --tablesize 1e12 2> {log}
