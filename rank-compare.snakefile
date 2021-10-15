@@ -18,7 +18,7 @@ gtdb_taxonomy=config.get('gtdb_taxonomy', '/group/ctbrowngrp/gtdb/gtdb-rs202.tax
 out_dir = config.get('output_dir', 'outputs')
 logs_dir = os.path.join(out_dir, "logs")
 basename = config.get('basename', 'gtdb-rs202')
-database_dir = 'databases'
+database_dir = '/group/ctbrowngrp/gtdb/databases'
 # how to incorporate db info??
 search_databases = config.get('search_databases', ['gtdb-rs202'])
 input_type = config.get('input_type', 'protein')
@@ -90,7 +90,7 @@ rule shared_kmers_picklist_intersect:
         """
         sourmash sig intersect {input.db} \
                  --ksize {wildcards.ksize} {params.alpha} \
-                 --picklist {input.picklist} -o {output} 2> {log}
+                 --picklist {input.picklist}:ident:identprefix -o {output} 2> {log}
         """
 
 # use sourmash sig intersect to get k-mers shared by taxonomy group
