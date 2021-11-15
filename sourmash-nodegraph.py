@@ -53,7 +53,11 @@ def main(args):
         records = screed_open_fasta(fasta, strict_mode=False)
         for x, record in enumerate(records):
             if "*" in record.sequence:
-                continue
+                if (record.sequence).endswith('*'):
+                    record.sequence = record.sequence[:-1]
+                else:
+                    sys.stderr.write(f"Protein with internal stop ignored:\n{record.name}\n{record.sequence}\n")
+                    continue
             if is_protein:
                 mh.add_protein(record.sequence)
             else:

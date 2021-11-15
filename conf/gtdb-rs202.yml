@@ -12,9 +12,9 @@ run_alphabets:
 
 
 alphabet_info:
-  #nucleotide:
-  #  ksize: [21,31,51]
-  #  scaled: [1000,2000]
+  nucleotide:
+    ksize: [21,31,51]
+    scaled: [1000,2000]
   protein:
     #ksize: [7,8,9,10,11]
     ksize: [10]

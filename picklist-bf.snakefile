@@ -14,9 +14,12 @@ basename = config['basename']
 ACCS =  tax_info["ident"]
 tax_info.set_index("ident", inplace=True)
 
-logs_dir = 'genbank/logs'
-prodigal_dir = 'genbank/prodigal'
+#logs_dir = 'genbank/logs'
 out_dir = config['output_dir']
+logs_dir = os.path.join(out_dir, 'logs')
+#prodigal_dir = os.path.join(out_dir, 'prodigal')
+#logs_dir = 'genbank/logs'
+prodigal_dir = 'genbank/prodigal'
 
 class Checkpoint_MakePattern:
     def __init__(self, pattern):
@@ -350,7 +353,7 @@ rule make_sourmash_nodegraph_protein:
         mem=600000,
     shell:
         """
-        python sourmash-nodegraph.py --input-filelist {input} --output {output} -k {wildcards.ksize} --alphabet protein --tablesize 1e12 2> {log}
+        python sourmash-nodegraph.py --input-filelist {input} --output {output} -k {wildcards.ksize} --alphabet protein --tablesize 2e11 2> {log}
         """
 
 rule make_sourmash_nodegraph_dayhoff:
@@ -360,7 +363,7 @@ rule make_sourmash_nodegraph_dayhoff:
     benchmark: f"{logs_dir}/sourmash-nodegraph/{basename}.dayhoff-k{{ksize}}.benchmark"
     threads: 1
     resources:
-        mem=200000,
+        mem=150000,
     shell:
         """
         python sourmash-nodegraph.py {input} --output {output} -k {wildcards.ksize} --alphabet dayhoff --tablesize 1e10 2> {log}
@@ -373,7 +376,7 @@ rule make_sourmash_nodegraph_nucl:
     benchmark: f"{logs_dir}/sourmash-nodegraph/{basename}.nucleotide-k{{ksize}}.benchmark"
     threads: 1
     resources:
-        mem=100000,
+        mem=150000,
     shell:
         """
         python sourmash-nodegraph.py {input} --output {output} -k {wildcards.ksize} --alphabet nucleotide --tablesize 1e12 2> {log}
