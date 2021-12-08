@@ -71,6 +71,7 @@ def main(args):
             # at this point, we should have added all k-mers in this genome/proteome to the minhash.
             # add these to our defaultdict, then continue with all other genomes/proteomes in this picklist
             hashes_with_abundance = mh.hashes
+            import pdb;pdb.set_trace()
             for hashval, abund in hashes_with_abundance.items():
                 kmers[hashval] += abund
 

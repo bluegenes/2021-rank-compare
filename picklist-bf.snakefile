@@ -344,16 +344,22 @@ rule picklist_unique_kmers_protein_khmer:
 # read new fastas from file instead of getting each time?
 rule make_sourmash_nodegraph_protein:
 #    input: fasta=ancient(Checkpoint_MakePattern("{fastafile}"))
-    input: f"{out_dir}/fastalists/{basename}.protein.fastalist.txt"
+    input: 
+         fastalist=f"{out_dir}/fastalists/{basename}.protein.fastalist.txt",
     output: f"{out_dir}/sourmash-nodegraph/{basename}.protein-k{{ksize}}.nodegraph"
     log: f"{logs_dir}/sourmash-nodegraph/{basename}.protein-k{{ksize}}.log"
     benchmark: f"{logs_dir}/sourmash-nodegraph/{basename}.protein-k{{ksize}}.benchmark"
-    threads: 1
+    params:
+        tablesize=config.get('nodegraph_tablesize', 1e10),
+        # full gtdb: 2e11 was plenty, could even go smaller
+    threads: 1 
     resources:
         mem=600000,
     shell:
         """
-        python sourmash-nodegraph.py --input-filelist {input} --output {output} -k {wildcards.ksize} --alphabet protein --tablesize 2e11 2> {log}
+        python sourmash-nodegraph.py --input-filelist {input.fastalist} \
+               --output {output} -k {wildcards.ksize} \
+               --alphabet protein --tablesize {params.tablesize} 2> {log}
         """
 
 rule make_sourmash_nodegraph_dayhoff:

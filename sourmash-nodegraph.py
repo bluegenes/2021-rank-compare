@@ -48,6 +48,7 @@ def main(args):
 
     # init bf
     bloom_filter = Nodegraph(args.ksize, tablesize, args.n_tables)
+    sys.stderr.write(f"Building sourmash nodegraph, tablesize: {tablesize}; n_tables: {args.n_tables}")
     mh = sourmash.MinHash(n=0, ksize=args.ksize, scaled=1, is_protein=is_protein, dayhoff=is_dayhoff, hp=is_hp)
     for n, fasta in enumerate(input_files):
         records = screed_open_fasta(fasta, strict_mode=False)
@@ -75,10 +76,14 @@ def main(args):
 
     # check expected collisions
     expected_collisions = bloom_filter.expected_collisions
-    sys.stderr.write(f"Expected collisions: {expected_collisions}")
+    sys.stderr.write(f"Nodegraph details:  tablesize: {tablesize}; n_tables: {args.n_tables}\n")
+    sys.stderr.write(f"Expected collisions: {expected_collisions}\n")
     calc_expected_collisions(bloom_filter, force=True, max_false_pos=args.max_false_pos)
-
-    bloom_filter.save(args.output)
+    if expected_collisions > args.max_false_pos:
+        print('ERROR, FP rate is too high. Please increase tablesize.')
+        sys.exit(-1)
+    else:
+        bloom_filter.save(args.output)
 
 
 
