@@ -46,7 +46,7 @@ for alpha, info in config["alphabet_info"].items():
 
 rule all:
     input: 
-        expand(f"{out_dir}/prefetch/{compare_rank}/{{rank_tax}}.{{ak}}.prefetch.csv", rank_tax = alltax_at_rank[:1], ak=alpha_ksizes)
+        expand(f"{out_dir}/prefetch/{compare_rank}/{{rank_tax}}.{{ak}}.prefetch.csv", rank_tax = alltax_at_rank, ak=alpha_ksizes)
          #expand(os.path.join(out_dir, 'prefetch', '{acc}.{alphak}.prefetch.csv'), acc=taxDF.index, alphak=alpha_ksizes),
          #expand(os.path.join(out_dir, 'prefetch', '{acc}.{alphak}.compare.csv'), acc=taxDF.index, alphak=alpha_ksizes),
 
@@ -65,6 +65,10 @@ rule protein_rank_prefetch:
     log: f"{logs_dir}/prefetch/{compare_rank}/{{rank_tax}}/{{acc}}.protein-k{{ksize}}.prefetch.log"
     benchmark: f"{logs_dir}/prefetch/{compare_rank}/{{rank_tax}}/{{acc}}.protein-k{{ksize}}.prefetch.benchmark",
     conda: "conf/envs/sourmash-dist-dbextract.yml"
+    threads: 1
+    resources:
+        mem_mb=lambda wildcards, attempt: attempt * 6000,
+        runtime=6000
     shell:
         """
         echo "DB is {input.db}"
@@ -90,6 +94,10 @@ rule nucl_rank_prefetch:
     log: f"{logs_dir}/prefetch/{compare_rank}/{{rank_tax}}/{{acc}}.nucleotide-k{{ksize}}.prefetch.log"
     benchmark: f"{logs_dir}/prefetch/{compare_rank}/{{rank_tax}}/{{acc}}.nucleotide-k{{ksize}}.prefetch.benchmark",
     conda: "conf/envs/sourmash-dist-dbextract.yml"
+    threads: 1
+    resources:
+        mem_mb=lambda wildcards, attempt: attempt * 6000,
+        runtime=6000
     shell:
         """
         echo "DB is {input.db}"
