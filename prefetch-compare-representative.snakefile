@@ -20,15 +20,29 @@ print('reading taxonomy')
 taxDF = pd.read_csv(gtdb_taxonomy)
 
 compare_rank = config.get('rank', "genus")
-alltax_at_rank = taxDF[compare_rank].unique().tolist()
+
+
+alltax_at_rank, reps_at_rank = [],[]
+if compare_rank.lower() == "all":
+    reps_at_rank= taxDF[taxDF['is_representative'] == True]["ident"].tolist()
+else:
+    # here, get representatives for the rank
+    reps_at_rank= taxDF[taxDF['is_representative'] == True].groupby(compare_rank)["ident"].apply(list)
+    alltax_at_rank = taxDF[compare_rank].unique().tolist()
 # group all accs at rank (useful for all x all comparisons)
 #grouped_by_rank = taxDF.groupby(compare_rank)["ident"].apply(list)
-# here, get representatives for the rank
-reps_at_rank= taxDF[taxDF['is_representative'] == True].groupby(compare_rank)["ident"].apply(list)
+    
 picklist_dir = '/home/ntpierce/2021-rank-compare/gtdb-rs202-taxonomic-picklists'
 # replace spaces with underscoare (e.g. for species names)
 taxDF = taxDF.replace(r" ", "_", regex=True) # regex allows searching for partial str
 taxDF.set_index('ident', inplace=True)
+    
+ranktaxacc=[]
+if compare_rank != "all":
+    for ranktax in alltax_at_rank:
+        accs = reps_at_rank[ranktax][0],
+        these_ranktaxacc = expand(f"{ranktax}/{{acc}}", acc=accs)
+        ranktaxacc.extend(these_ranktaxacc)
 
 # check params are in the right format, build alpha-ksize combos
 alpha_ksize_scaled=[]
@@ -52,17 +66,18 @@ wildcard_constraints:
     rank_tax="\w+",
     ksize="\w+"
 
-ranktaxacc=[]
+outF = []
+if compare_rank == "all":
+    outF=expand(f"{out_dir}/prefetch/{basename}.{{aks}}.prefetch.csv", aks=alpha_ksize_scaled)
+else:
+    outF=expand(f"{out_dir}/prefetch/{basename}.{compare-rank}.{{aks}}.prefetch.csv", aks=alpha_ksize_scaled)
 
-for ranktax in alltax_at_rank:
-    accs = reps_at_rank[ranktax][0],
-    these_ranktaxacc = expand(f"{ranktax}/{{acc}}", acc=accs)
-    ranktaxacc.extend(these_ranktaxacc)
 
 rule all:
     input: 
+        outF
         #expand(f"{out_dir}/prefetch/{compare_rank}/{{rta}}.{{aks}}.prefetch.csv", rta = ranktaxacc, aks=alpha_ksize_scaled)
-        expand(f"{out_dir}/prefetch/{basename}.{compare_rank}.{{aks}}.prefetch.csv", aks=alpha_ksize_scaled)
+        #expand(f"{out_dir}/prefetch/{basename}.{compare_rank}.{{aks}}.prefetch.csv", aks=alpha_ksize_scaled)
          #expand(os.path.join(out_dir, 'prefetch', '{acc}.{alphak}.prefetch.csv'), acc=taxDF.index, alphak=alpha_ksizes),
          #expand(os.path.join(out_dir, 'prefetch', '{acc}.{alphak}.compare.csv'), acc=taxDF.index, alphak=alpha_ksizes),
 
@@ -71,15 +86,15 @@ rule all:
 rule protein_rank_prefetch:
     input: 
         #db=f"{database_dir}/gtdb-rs202.{{alphabet}}.k{{ksize}}.zip", #
-        db = f"{database_dir}/gtdb-rs202.protein.protein.k10.sbt.zip", # scaled 200
+        db = f"{database_dir}/gtdb-rs202.protein.protein.k10.sbt.zip", # scaled 200, k 10
         picklist = f"{picklist_dir}/{compare_rank}/gtdb-rs202.{{rank_tax}}.csv"
-    output: f"{out_dir}/prefetch/{compare_rank}/{{rank_tax}}/{{acc}}.protein-k{{ksize}}.prefetch.csv"
+    output: f"{out_dir}/prefetch/{compare_rank}/{{rank_tax}}/{{acc}}.protein-k{{ksize}}-scaled{{scaled}}.prefetch.csv"
     params:
         alpha= "--protein",
         threshold_bp=30000,
         acc_identprefix = lambda w: w.acc.rsplit('.')[0]
-    log: f"{logs_dir}/prefetch/{compare_rank}/{{rank_tax}}/{{acc}}.protein-k{{ksize}}.prefetch.log"
-    benchmark: f"{logs_dir}/prefetch/{compare_rank}/{{rank_tax}}/{{acc}}.protein-k{{ksize}}.prefetch.benchmark",
+    log: f"{logs_dir}/prefetch/{compare_rank}/{{rank_tax}}/{{acc}}.protein-k{{ksize}}-scaled{{scaled}}.prefetch.log"
+    benchmark: f"{logs_dir}/prefetch/{compare_rank}/{{rank_tax}}/{{acc}}.protein-k{{ksize}}-scaled{{scaled}}.prefetch.benchmark",
     conda: "conf/envs/sourmash-dist-dbextract.yml"
     threads: 1
     resources:
@@ -94,7 +109,7 @@ rule protein_rank_prefetch:
                  --ksize {wildcards.ksize} | sourmash prefetch - {input.db} \
                  --picklist {input.picklist}:ident:identprefix \
                  -o {output} -k {wildcards.ksize} {params.alpha} \
-                 --threshold-bp={params.threshold_bp} 2>> {log}
+                 --threshold-bp={params.threshold_bp}  --scaled {wildcards.scaled} 2>> {log}
         touch {output}
         """
 
@@ -127,7 +142,7 @@ rule nucl_rank_prefetch:
         touch {output}
         """
 
-rule aggregate_nucl_prefetch:
+rule aggregate_rank_nucl_prefetch:
     input: lambda w: expand(f"{out_dir}/prefetch/{compare_rank}/{{rta}}.nucleotide-k{{ksize}}-scaled{{scaled}}.prefetch.csv",  rta = ranktaxacc, ksize = w.ksize, scaled=w.scaled)
     output: f"{out_dir}/prefetch/{basename}.{compare_rank}.nucleotide-k{{ksize}}-scaled{{scaled}}.prefetch.csv"
     log: f"{logs_dir}/prefetch/{basename}.{compare_rank}.nucleotide-k{{ksize}}-scaled{{scaled}}.prefetch.log" 
@@ -138,12 +153,57 @@ rule aggregate_nucl_prefetch:
         aggDF["alpha-ksize"] =  "nucleotide-k" + str(wildcards.ksize)
         aggDF.to_csv(str(output), index=False)
 
-rule aggregate_prot_prefetch:
-    input: lambda w: expand(f"{out_dir}/prefetch/{compare_rank}/{{rt}}/{{acc}}.protein-k{{ksize}}.prefetch.csv", acc = reps_at_rank[w.rank_tax], rt = w.rank_tax, ksize = w.ksize)
-    output: f"{out_dir}/prefetch/{compare_rank}/{{rank_tax}}.protein-k{{ksize}}.prefetch.csv"
-    log: f"{logs_dir}/prefetch/{compare_rank}/{{rank_tax}}.protein-k{{ksize}}.prefetch.log" 
-    benchmark: f"{logs_dir}/prefetch/{compare_rank}/{{rank_tax}}.protein-k{{ksize}}.prefetch.benchmark" 
+rule aggregate_rank_prot_prefetch:
+    input: lambda w: expand(f"{out_dir}/prefetch/{compare_rank}/{{rta}}.protein-k{{ksize}}-scaled{{scaled}}.prefetch.csv",  rta = ranktaxacc, ksize = w.ksize, scaled=w.scaled)
+    output: f"{out_dir}/prefetch/{basename}.{compare_rank}.protein-k{{ksize}}-scaled{{scaled}}.prefetch.csv"
+    log: f"{logs_dir}/prefetch/{basename}.{compare_rank}.protein-k{{ksize}}-scaled{{scaled}}.prefetch.log" 
+    benchmark: f"{logs_dir}/prefetch/{basename}.{compare_rank}.protein-k{{ksize}}-scaled{{scaled}}.prefetch.benchmark" 
+    run:
+        # aggregate all csvs --> single csv
+        aggDF = pd.concat([pd.read_csv(str(csv), sep=",") for csv in input])
+        aggDF["alpha-ksize"] =  "protein-k" + str(wildcards.ksize)
+        aggDF.to_csv(str(output), index=False)
+
+
+# use prefetch to do comparison for each ident 
+rule protein_all_prefetch:
+    input: 
+        #db=f"{database_dir}/gtdb-rs202.{{alphabet}}.k{{ksize}}.zip", #
+        db = f"{database_dir}/gtdb-rs202.protein.protein.k10.sbt.zip", # scaled 200, k 10
+        #picklist = gtdb_taxonomy
+    output: f"{out_dir}/prefetch/gtdb-all/{{acc}}.protein-k{{ksize}}-scaled{{scaled}}.prefetch.csv"
+    params:
+        alpha= "--protein",
+        threshold_bp=30000,
+        acc_identprefix = lambda w: w.acc.rsplit('.')[0]
+    log: f"{logs_dir}/prefetch/gtdb-all/{{acc}}.protein-k{{ksize}}-scaled{{scaled}}.prefetch.log"
+    benchmark: f"{logs_dir}/prefetch/gtdb-all/{{acc}}.protein-k{{ksize}}-scaled{{scaled}}.prefetch.benchmark",
+    conda: "conf/envs/sourmash-dist-dbextract.yml"
+    threads: 1
+    resources:
+        mem_mb=lambda wildcards, attempt: attempt * 50000,
+        runtime=10000
     shell:
         """
-        cat {input} > {output} 2> {log}
+        echo "DB is {input.db}"
+        echo "DB is {input.db}" > {log}
+
+        sourmash database extract {input.db} --identprefix {params.acc_identprefix} \
+                 --ksize {wildcards.ksize} | sourmash prefetch - {input.db} \
+                 -o {output} -k {wildcards.ksize} {params.alpha} \
+                 --threshold-bp={params.threshold_bp} --scaled {wildcards.scaled} 2>> {log}
+        touch {output}
         """
+                 #--picklist {input.picklist}:ident:identprefix \
+
+rule aggregate_allgtdb_prot_prefetch:
+    input: lambda w: expand(f"{out_dir}/prefetch/gtdb-all/{{acc}}.protein-k{{ksize}}-scaled{{scaled}}.prefetch.csv",  acc = reps_at_rank, ksize = w.ksize, scaled=w.scaled)
+    output: f"{out_dir}/prefetch/{basename}.protein-k{{ksize}}-scaled{{scaled}}.prefetch.csv"
+    log: f"{logs_dir}/prefetch/{basename}.protein-k{{ksize}}-scaled{{scaled}}.prefetch.log" 
+    benchmark: f"{logs_dir}/prefetch/{basename}.protein-k{{ksize}}-scaled{{scaled}}.prefetch.benchmark" 
+    run:
+        # aggregate all csvs --> single csv
+        aggDF = pd.concat([pd.read_csv(str(csv), sep=",") for csv in input])
+        aggDF["alpha-ksize"] =  "protein-k" + str(wildcards.ksize)
+        aggDF.to_csv(str(output), index=False)
+
