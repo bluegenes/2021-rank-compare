@@ -6,6 +6,8 @@ import glob
 import pprint
 
 import pandas as pd
+from tqdm import tqdm
+tqdm.pandas()
 
 import screed
 import sourmash
@@ -16,7 +18,7 @@ from sourmash.picklist import SignaturePicklist
 from collections import defaultdict, namedtuple
 
 CompareResult = namedtuple('CompareResult',
-                           'comparison_name, anchor_name, ref_name, path, lowest_common_rank, alphabet, ksize, scaled, jaccard, max_containment, anchor_containment, anchor_hashes, query_hashes, num_common')
+                           'comparison_name, sigA_name, sigB_name, lowest_common_rank, lowest_common_lineage, alphabet, ksize, scaled, jaccard, max_containment, A_containment, B_containment, sigA_hashes, sigB_hashes, intersect_hashes')
 
 def compare_sigs(sigA, sigB, comparison_name, lowest_common_rank, lowest_common_lineage, alpha, ksize, scaled):
     A_name = str(sigA).split(" ")[0]
@@ -29,7 +31,7 @@ def compare_sigs(sigA, sigB, comparison_name, lowest_common_rank, lowest_common_
     containB = sigB.contained_by(sigA)
     max_contain = sigA.max_containment(sigB)
     #max_contain = max(containA,containB)
-    return CompareResult(comparison_name, str(sigA).split(" ")[0], str(sigB).split(" ")[0], path_name, lowest_common_rank, alpha, ksize, scaled, jaccard, max_contain, containA, sigA_numhashes, sigB_numhashes, intersect_numhashes)
+    return CompareResult(comparison_name, A_name, B_name, lowest_common_rank, lowest_common_lineage, alpha, ksize, scaled, jaccard, max_contain, containA, containB, sigA_numhashes, sigB_numhashes, intersect_numhashes)
 
 def find_lca(linA,linB, reverse_taxlist=['species', 'genus', 'family', 'order', 'class', 'phylum', 'superkingdom']):
     lca_rank=None
@@ -64,7 +66,7 @@ def main(args):
     gtdb_taxonomy.set_index('ident', inplace=True)
     cols = ['superkingdom', 'phylum', 'class', 'order', 'family', 'genus', 'species']
     gtdb_taxonomy['rank'] = gtdb_taxonomy[cols].agg(';'.join, axis=1)
-    gtdb_taxonomy = gtdb_taxonomy.apply(make_lineages, axis=1)
+    gtdb_taxonomy = gtdb_taxonomy.progress_apply(make_lineages, axis=1)
 
     print(f'loading database {args.database}')
     # for ident in taxonomy csv, compare to all remaining. Keep list of "done" and exclude via picklist EXCLUDE
@@ -76,31 +78,33 @@ def main(args):
     comparison_idents = gtdb_taxonomy.index[1:]
     #loop through comparisons
     output_fieldnames = CompareResult._fields # may need to be list?
-    for n, ident in enumerate(gtdb_taxonomy['ident']):
+    for n, ident in enumerate(gtdb_taxonomy.index):
         #print(f'starting comparisons with ident {ident}')
-        if n !=0 and n % 1000 == 0:
-            print(f"... comparing {n}th ident, ident name: {ident}\n")
+        if n % 1000 == 0:
+            print(f"... comparing {n}th ident, {ident}\n")
 
         # select and load anchor ident
         picklist = SignaturePicklist('ident')
         picklist.init([ident])
-        anchor_sig_select = next(gtdb_zip.select(picklist=picklist, ksize=ksize, moltype=moltype).signatures())
+        anchor_sig = next(gtdb.select(picklist=picklist, ksize=ksize, moltype=moltype).signatures())
         #anchor_sig = next(anchor_sig_select)
 
         # grab anchor lineage
         anchor_lin = gtdb_taxonomy.at[ident, 'lineage']
 
         # make output file for this anchor
-        this_outfile = os.path.join(args.outdir, f"{ident}.gtdb-compare.csv")
+        if not os.path.exists(args.output_dir):
+            os.makedirs(args.output_dir, exist_ok=True)
+        this_outfile = os.path.join(args.output_dir, f"{ident}.gtdb-compare.csv")
         with open(this_outfile, 'w') as outF:
             w = csv.DictWriter(outF, fieldnames=output_fieldnames)
 
             # load this sig and make a comparison
-            for compare_ident in comparison_idents:
-                import pdb;pdb.set_trace()
+            comparisons = []
+            for compare_ident in tqdm(comparison_idents):
                 picklist = SignaturePicklist('ident')
                 picklist.init([compare_ident])
-                compare_sig_gen = next(gtdb.select(picklist=picklist, ksize=ksize, moltype=moltype).signatures())
+                compare_sig = next(gtdb.select(picklist=picklist, ksize=ksize, moltype=moltype).signatures())
                 #compare_sig = next(compare_sig_gen)
                 compare_lin = gtdb_taxonomy.at[compare_ident, 'lineage']
 
@@ -109,7 +113,9 @@ def main(args):
 
                 comparison = compare_sigs(anchor_sig, compare_sig, f"{ident}_x_{compare_ident}", lca_rank, lca_lin, alphabet, ksize, scaled)
                 # write comparison to file
-                w.writerow(comparison)
+                comparisons.append(comparison)
+            for c in comparisons:
+                w.writerow(c._asdict())
 
         # remove top ident, which will be next anchor
         comparison_idents = comparison_idents[1:]

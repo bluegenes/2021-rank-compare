@@ -80,7 +80,7 @@ outF = []
 if compare_rank == "all":
     outF=expand(f"{out_dir}/prefetch/{basename}.{{aks}}.prefetch.csv", aks=alpha_ksize_scaled)
 else:
-    outF=expand(f"{out_dir}/prefetch/{basename}.{compare-rank}.{{aks}}.prefetch.csv", aks=alpha_ksize_scaled)
+    outF=expand(f"{out_dir}/prefetch/{basename}.{compare_rank}.{{aks}}.prefetch.csv", aks=alpha_ksize_scaled)
 
 
 rule all:
@@ -101,7 +101,7 @@ rule protein_rank_prefetch:
     output: f"{out_dir}/prefetch/{compare_rank}/{{rank_tax}}/{{acc}}.protein-k{{ksize}}-scaled{{scaled}}.prefetch.csv"
     params:
         alpha= "--protein",
-        threshold_bp=30000,
+        threshold_bp=3000,
         acc_identprefix = lambda w: w.acc.rsplit('.')[0]
     log: f"{logs_dir}/prefetch/{compare_rank}/{{rank_tax}}/{{acc}}.protein-k{{ksize}}-scaled{{scaled}}.prefetch.log"
     benchmark: f"{logs_dir}/prefetch/{compare_rank}/{{rank_tax}}/{{acc}}.protein-k{{ksize}}-scaled{{scaled}}.prefetch.benchmark",
@@ -130,7 +130,7 @@ rule nucl_rank_prefetch:
     output: f"{out_dir}/prefetch/{compare_rank}/{{rank_tax}}/{{acc}}.nucleotide-k{{ksize}}-scaled{{scaled}}.prefetch.csv"
     params:
         alpha= "--dna",
-        threshold_bp=100000,
+        threshold_bp=10000,
         acc_identprefix = lambda w: w.acc.rsplit('.')[0]
     log: f"{logs_dir}/prefetch/{compare_rank}/{{rank_tax}}/{{acc}}.nucleotide-k{{ksize}}-scaled{{scaled}}.prefetch.log"
     benchmark: f"{logs_dir}/prefetch/{compare_rank}/{{rank_tax}}/{{acc}}.nucleotide-k{{ksize}}-scaled{{scaled}}.prefetch.benchmark",
@@ -191,7 +191,7 @@ rule protein_all_prefetch:
     conda: "conf/envs/sourmash-dist-dbextract.yml"
     threads: 1
     resources:
-        mem_mb=lambda wildcards, attempt: attempt * 6000,
+        mem_mb=lambda wildcards, attempt: attempt * 15000,
         runtime=130
     shell:
         """
@@ -222,7 +222,11 @@ rule nucl_all_prefetch:
     resources:
         #mem_mb=lambda wildcards, attempt: attempt * 20000,
         mem_mb=lambda wildcards, attempt: attempt * 6000,
-        runtime=130
+        disk_mb=lambda wildcards, attempt: attempt * 6000,
+        runtime=120,
+        time=120,
+        partition="low2",
+        #partition="med2",
     shell:
         """
         echo "DB is {input.db}"
@@ -236,6 +240,7 @@ rule nucl_all_prefetch:
         """
                  #--picklist {input.picklist}:ident:identprefix \
 
+localrules: aggregate_allgtdb_prot_prefetch
 rule aggregate_allgtdb_prot_prefetch:
     input: lambda w: expand(f"{out_dir}/prefetch/gtdb-all/{{acc}}.protein-k{{ksize}}-scaled{{scaled}}.prefetch.csv",  acc = accs_to_prefetch, ksize = w.ksize, scaled=w.scaled)
     output: f"{out_dir}/prefetch/{basename}.protein-k{{ksize}}-scaled{{scaled}}.prefetch.csv"
@@ -247,6 +252,7 @@ rule aggregate_allgtdb_prot_prefetch:
         aggDF["alpha-ksize"] =  "protein-k" + str(wildcards.ksize)
         aggDF.to_csv(str(output), index=False)
 
+localrules: aggregate_allgtdb_nucl_prefetch
 rule aggregate_allgtdb_nucl_prefetch:
     input: lambda w: expand(f"{out_dir}/prefetch/gtdb-all/{{acc}}.nucleotide-k{{ksize}}-scaled{{scaled}}.prefetch.csv",  acc = accs_to_prefetch, ksize = w.ksize, scaled=w.scaled)
     output: f"{out_dir}/prefetch/{basename}.nucleotide-k{{ksize}}-scaled{{scaled}}.prefetch.csv"
