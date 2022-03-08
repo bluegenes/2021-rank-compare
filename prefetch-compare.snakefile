@@ -78,7 +78,8 @@ wildcard_constraints:
 
 outF = []
 if compare_rank == "all":
-    outF=expand(f"{out_dir}/prefetch/{basename}.{{aks}}.prefetch.csv", aks=alpha_ksize_scaled)
+    outF=expand(f"{out_dir}/prefetch/{basename}.{{aks}}.prefetch.csv.gz", aks=alpha_ksize_scaled)
+    outF += expand(f"{out_dir}/prefetch/{basename}.{{aks}}.binned_containment_ani.csv", aks=alpha_ksize_scaled)
 else:
     outF=expand(f"{out_dir}/prefetch/{basename}.{compare_rank}.{{aks}}.prefetch.csv", aks=alpha_ksize_scaled)
 
@@ -243,24 +244,72 @@ rule nucl_all_prefetch:
 localrules: aggregate_allgtdb_prot_prefetch
 rule aggregate_allgtdb_prot_prefetch:
     input: lambda w: expand(f"{out_dir}/prefetch/gtdb-all/{{acc}}.protein-k{{ksize}}-scaled{{scaled}}.prefetch.csv",  acc = accs_to_prefetch, ksize = w.ksize, scaled=w.scaled)
-    output: f"{out_dir}/prefetch/{basename}.protein-k{{ksize}}-scaled{{scaled}}.prefetch.csv"
+    output: f"{out_dir}/prefetch/{basename}.protein-k{{ksize}}-scaled{{scaled}}.prefetch.csv.gz"
     log: f"{logs_dir}/prefetch/{basename}.protein-k{{ksize}}-scaled{{scaled}}.prefetch.log" 
     benchmark: f"{logs_dir}/prefetch/{basename}.protein-k{{ksize}}-scaled{{scaled}}.prefetch.benchmark" 
     run:
         # aggregate all csvs --> single csv
-        aggDF = pd.concat([pd.read_csv(str(csv), sep=",") for csv in input])
-        aggDF["alpha-ksize"] =  "protein-k" + str(wildcards.ksize)
+        dfs_to_concat = []
+        for inF in input:
+            this_df = pd.read_csv(str(inF), sep=',')
+            this_df = this_df[~(this_df["match_name"] == this_df["query_name"])]
+            if not this_df.empty:
+                this_df["alpha-ksize"] =  "protein-k" + str(wildcards.ksize)
+                dfs_to_concat.append(this_df)
+
+        aggDF = pd.concat(dfs_to_concat)
+        # aggregate all csvs --> single csv
+        #aggDF = pd.concat([pd.read_csv(str(csv), sep=",") for csv in input])
+        #aggDF["alpha-ksize"] =  "protein-k" + str(wildcards.ksize)
         aggDF.to_csv(str(output), index=False)
 
 localrules: aggregate_allgtdb_nucl_prefetch
 rule aggregate_allgtdb_nucl_prefetch:
     input: lambda w: expand(f"{out_dir}/prefetch/gtdb-all/{{acc}}.nucleotide-k{{ksize}}-scaled{{scaled}}.prefetch.csv",  acc = accs_to_prefetch, ksize = w.ksize, scaled=w.scaled)
-    output: f"{out_dir}/prefetch/{basename}.nucleotide-k{{ksize}}-scaled{{scaled}}.prefetch.csv"
+    output: 
+        full_output=f"{out_dir}/prefetch/{basename}.nucleotide-k{{ksize}}-scaled{{scaled}}.prefetch.csv.gz",
+        binned_containment_ani=f"{out_dir}/prefetch/{basename}.nucleotide-k{{ksize}}-scaled{{scaled}}.binned_containment_ani.csv"
     log: f"{logs_dir}/prefetch/{basename}.nucleotide-k{{ksize}}-scaled{{scaled}}.prefetch.log" 
     benchmark: f"{logs_dir}/prefetch/{basename}.nucleotide-k{{ksize}}-scaled{{scaled}}.prefetch.benchmark" 
     run:
         # aggregate all csvs --> single csv
-        aggDF = pd.concat([pd.read_csv(str(csv), sep=",") for csv in input])
-        aggDF["alpha-ksize"] =  "protein-k" + str(wildcards.ksize)
-        aggDF.to_csv(str(output), index=False)
+        dfs_to_concat = []
+        ksize = str(wildcards.ksize)
+        for inF in input:
+            this_df = pd.read_csv(str(inF), sep=',')
+            this_df = this_df[~(this_df["match_name"] == this_df["query_name"])]
+            if not this_df.empty:
+                #this_df['check_dupes'] = this_df[["match_name", "query_name"]].apply(set, axis=1)
+                this_df["alpha-ksize"] =  f"nucleotide-{ksize}"
+                dfs_to_concat.append(this_df)
+
+        # aggregate all
+        aggDF = pd.concat(dfs_to_concat)
+        print(aggDF.shape)
+        # drop duplicated comparisons
+        #aggDF.drop_duplicates(subset = "check_dupes", inplace=True)
+        print(aggDF.shape)
+        # get average containment/ani
+        aggDF['avg_containment'] = aggDF[["f_query_match", "f_match_query"]].mean(axis=1)
+        aggDF['avg_containment_ani'] = aggDF[["query_ani", "match_ani"]].mean(axis=1)
+        # bin by containment; compare ANI
+        containment_bins05 = np.arange(0, 1.01, 0.05)
+        aggDF['binned_avg_containment05'] = pd.cut(x=aggDF['avg_containment'], bins=containment_bins05)
+        contain05_info = aggDF.groupby('binned_avg_containment05').agg({'avg_containment_ani': ['count','min', 'max', 'mean']}).round(2)
+        contain05_info.columns = contain05_info.columns.droplevel()
+        contain05_info.reset_index(inplace=True)
+        rename_cols = {"min": "minANI", "max": "maxANI", "mean": "meanANI"}
+        contain05_info.rename(columns = rename_cols, inplace=True)
+        # make separate col with str so we can modify it. keep categorical col for plotting.
+        contain05_info['crange'] = contain05_info['binned_avg_containment05'].astype("str")
+        contain05_info['highContainment'] = contain05_info['crange'].str.split(',', expand=True)[1].str.rstrip(']').str.strip()
+        contain05_info.drop(columns=["crange"], inplace=True) # no need for this dup col. keep categorical col for plotting.
+        contain05_info.to_csv(output.binned_containment_ani, index=False)
+        # todo: maybe plot ANI?
+        aggDF.to_csv(str(output.full_output), index=False)
+        
+        #aggDF = pd.concat([pd.read_csv(str(csv), sep=",") for csv in input])
+        #aggDF["alpha-ksize"] =  "protein-k" + str(wildcards.ksize)
+        #aggDF[~aggDF["match_name"] == aggDF["query_name"]]
+        #aggDF.to_csv(str(output), index=False)
 
