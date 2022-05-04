@@ -181,7 +181,8 @@ rule protein_all_prefetch:
     conda: "conf/envs/sourmash-dist-dbextract.yml"
     threads: 1
     resources:
-        mem_mb=lambda wildcards, attempt: attempt * 50000,
+        mem_mb=lambda wildcards, attempt: attempt * 20000,
+        #mem_mb=lambda wildcards, attempt: attempt * 6000,
         runtime=10000
     shell:
         """
@@ -192,8 +193,8 @@ rule protein_all_prefetch:
                  --ksize {wildcards.ksize} | sourmash prefetch - {input.db} \
                  -o {output} -k {wildcards.ksize} {params.alpha} \
                  --threshold-bp={params.threshold_bp} --scaled {wildcards.scaled} 2>> {log}
-        touch {output}
         """
+        #touch {output}
                  #--picklist {input.picklist}:ident:identprefix \
 
 rule aggregate_allgtdb_prot_prefetch:

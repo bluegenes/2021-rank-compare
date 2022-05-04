@@ -60,7 +60,8 @@ for alpha, info in config["alphabet_info"].items():
 
 rule all:
     input: 
-         expand(os.path.join(out_dir, 'unroll-compare', '{rt}.{alphak}.compare.csv'), rt=rank_taxinfo, alphak=alpha_ksizes)
+         expand(os.path.join(out_dir, 'unroll-compare', '{rt}.{alphak}.compare.csv'), rt=rank_taxinfo, alphak=alpha_ksizes),
+#         expand(os.path.join(out_dir, 'unroll-compare', f'{basename}.{{alphak}}.compare.csv'), alphak=alpha_ksizes),
          #expand(os.path.join(out_dir, f'{basename}-taxonomic-picklists', '{rt}.csv'), rt=rank_taxinfo),
          #expand(os.path.join(out_dir, 'shared-kmers', '{ranktaxinf}.{alphak}.shared-kmers.csv'), ranktaxinf=rank_taxinfo, alphak=alpha_ksizes),
 
@@ -158,3 +159,21 @@ rule unroll_compare:
         """
         python  unroll-compare.py {input.max_contain} {input.jaccard} -o {output} 2> {log}
         """
+
+#rule aggregate_unrolled:
+#    input:
+#        expand(os.path.join(out_dir, 'unroll-compare', '{rt}.{alphak}.compare.csv'), rt=rank_taxinfo, alphak=alpha_ksizes)
+#        #os.path.join(out_dir, 'unroll-compare', '{rank}', '{basename}.{taxon}.{alphabet}-k{ksize}.compare.csv')
+#    output:
+#        os.path.join(out_dir, 'unroll-compare', '{basename}.{alphabet}-k{ksize}.compare.csv')
+#    log: os.path.join(logs_dir, 'aggregate_unrolled', '{basename}.{alphabet}-k{ksize}.aggregate_unrolled.log')
+#    benchmark: os.path.join(logs_dir, 'aggregate_unrolled', '{basename}.{alphabet}-k{ksize}.aggregate_unrolled.benchmark')
+#    # could shell cat these, but not sure if we'd hit the cli limit..
+#    #run:
+#        with open(str(output), 'w') as outF):
+#            for inF in input:
+#                with open(str(inF), 'r') as f:
+#                    for line in f:
+#                        outF.write(line)
+            
+        

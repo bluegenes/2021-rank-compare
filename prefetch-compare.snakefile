@@ -4,9 +4,14 @@ Run: snakemake -j1 -n
 """
 
 import pandas as pd
+import dask.dataframe as dd
 from collections import defaultdict
-#from tqdm import tqdm
-#tqdm.pandas()
+import numpy as np
+from tqdm import tqdm
+tqdm.pandas()
+from dask.diagnostics import ProgressBar
+ProgressBar().register()
+
 
 # requires taxonomy with representitive info
 gtdb_taxonomy=config.get('gtdb_taxonomy', 'gtdb-rs202.taxonomy.with-repinfo.csv')
@@ -56,6 +61,8 @@ if compare_rank != "all":
 
 # check params are in the right format, build alpha-ksize combos
 alpha_ksize_scaled=[]
+nucl_alpha_ksize_scaled=[]
+prot_alpha_ksize_scaled=[]
 for alpha, info in config["alphabet_info"].items():
     scaled = info["scaled"]
     ksize = info["ksize"]
@@ -66,10 +73,10 @@ for alpha, info in config["alphabet_info"].items():
         ksize=[ksize]
         config["alphabet_info"][alpha]["ksize"] = ksize
     # build a parameter for the right combinations
-    #if alpha == 'protein':
-    #    prot_alpha_ksizes += expand(f"{alpha}-k{{ksize}}", ksize = ksize)
-    #if alpha == 'nucleotide':
-    #    nucl_alpha_ksizes += expand(f"{alpha}-k{{ksize}}", ksize = ksize)
+    if alpha == 'protein':
+        prot_alpha_ksize_scaled += expand(f"{alpha}-k{{ksize}}-scaled{{scaled}}", ksize = ksize, scaled=scaled)
+    if alpha == 'nucleotide':
+        nucl_alpha_ksize_scaled += expand(f"{alpha}-k{{ksize}}-scaled{{scaled}}", ksize = ksize, scaled=scaled)
     alpha_ksize_scaled += expand(f"{alpha}-k{{ksize}}-scaled{{scaled}}", ksize = ksize, scaled=scaled)
 
 wildcard_constraints:
@@ -78,11 +85,17 @@ wildcard_constraints:
 
 outF = []
 if compare_rank == "all":
-    outF=expand(f"{out_dir}/prefetch/{basename}.{{aks}}.prefetch.csv.gz", aks=alpha_ksize_scaled)
-    outF += expand(f"{out_dir}/prefetch/{basename}.{{aks}}.binned_containment_ani.csv", aks=alpha_ksize_scaled)
+    # to do: change nucl to parquet too
+    outF=expand(f"{out_dir}/prefetch/{basename}.{{aks}}.prefetch.parquet.gz", aks=alpha_ksize_scaled)
+    
+    if "nucleotide" in config["alphabet_info"].keys():
+        outF += expand(f"{out_dir}/prefetch/{basename}.{{aks}}.binned_containment_ani.csv", aks=nucl_alpha_ksize_scaled)
+    if "protein" in config["alphabet_info"].keys():
+        outF += expand(f"{out_dir}/prefetch/{basename}.{{aks}}.binned_containment_aai.csv", aks=prot_alpha_ksize_scaled)
 else:
     outF=expand(f"{out_dir}/prefetch/{basename}.{compare_rank}.{{aks}}.prefetch.csv", aks=alpha_ksize_scaled)
 
+print(outF)
 
 rule all:
     input: 
@@ -244,24 +257,103 @@ rule nucl_all_prefetch:
 localrules: aggregate_allgtdb_prot_prefetch
 rule aggregate_allgtdb_prot_prefetch:
     input: lambda w: expand(f"{out_dir}/prefetch/gtdb-all/{{acc}}.protein-k{{ksize}}-scaled{{scaled}}.prefetch.csv",  acc = accs_to_prefetch, ksize = w.ksize, scaled=w.scaled)
-    output: f"{out_dir}/prefetch/{basename}.protein-k{{ksize}}-scaled{{scaled}}.prefetch.csv.gz"
+    output:
+        full_output=f"{out_dir}/prefetch/{basename}.protein-k{{ksize}}-scaled{{scaled}}.prefetch.csv.gz",
+        binned_containment_aai=f"{out_dir}/prefetch/{basename}.protein-k{{ksize}}-scaled{{scaled}}.binned_containment_aai.csv",
+        cAAI_png=f"{out_dir}/prefetch/{basename}.protein-k{{ksize}}-scaled{{scaled}}.binned_containment_aai.png",
+        cAAI_pdf=f"{out_dir}/prefetch/{basename}.protein-k{{ksize}}-scaled{{scaled}}.binned_containment_aai.pdf",
     log: f"{logs_dir}/prefetch/{basename}.protein-k{{ksize}}-scaled{{scaled}}.prefetch.log" 
     benchmark: f"{logs_dir}/prefetch/{basename}.protein-k{{ksize}}-scaled{{scaled}}.prefetch.benchmark" 
     run:
         # aggregate all csvs --> single csv
         dfs_to_concat = []
+        ksize = str(wildcards.ksize)
+        #infiles = [str(f) for f in input]
+        #import pdb;pdb.set_trace()
+        #aggDF = dd.read_csv(infiles) # this just reads in the first, but will read in all when needed, i think?
+        # get average containment, AAI
+        #aggDF['avg_containment'] = aggDF[["f_query_match", "f_match_query"]].mean(axis=1)
+        #aggDF['avg_containment_aai'] = aggDF[["query_ani", "match_ani"]].mean(axis=1)
+        # bin by containment; compare ANI
+        #containment_bins05 = np.arange(0, 1.01, 0.05)
+        #aggDF['binned_avg_containment05'] = pd.cut(x=aggDF['avg_containment'], bins=containment_bins05)
+        #aggDF['binned_avg_containment05'] = aggDF['avg_containment'].map_partitions(pd.cut, containment_bins05)
+
+        #contain05_info = aggDF.groupby('binned_avg_containment05').agg({'avg_containment_ani': ['count','min', 'max', 'mean']}).round(2)#.compute()
+        #contain05_info.columns = contain05_info.columns.droplevel()
+        #contain05_info.reset_index(inplace=True)
+        #rename_cols = {"min": "minAAI", "max": "maxAAI", "mean": "meanAAI"}
+        #contain05_info.rename(columns = rename_cols, inplace=True)
+        # make separate col with str so we can modify it. keep categorical col for plotting.
+        #contain05_info['crange'] = contain05_info['binned_avg_containment05'].astype("str")
+        #contain05_info['highContainment'] = contain05_info['crange'].str.split(',', expand=True)[1].str.rstrip(']').str.strip()
+        #contain05_info.drop(columns=["crange"], inplace=True) # no need for this dup col. keep categorical col for plotting.
+        #contain05_info.to_csv(output.binned_containment_aai, index=False)
+        # todo: maybe plot AAI?
+        #aggDF.to_parquet(str(output.full_output), index=False)
+        
+        #aggDF = pd.concat([pd.read_csv(str(csv), sep=",") for csv in input])
+        #aggDF["alpha-ksize"] =  "protein-k" + str(wildcards.ksize)
+        
+        # pandas read_csv version
         for inF in input:
             this_df = pd.read_csv(str(inF), sep=',')
             this_df = this_df[~(this_df["match_name"] == this_df["query_name"])]
             if not this_df.empty:
-                this_df["alpha-ksize"] =  "protein-k" + str(wildcards.ksize)
+                this_df["alpha-ksize"] =  f"protein-k{ksize}"
                 dfs_to_concat.append(this_df)
-
         aggDF = pd.concat(dfs_to_concat)
+        #import pdb;pdb.set_trace()
         # aggregate all csvs --> single csv
         #aggDF = pd.concat([pd.read_csv(str(csv), sep=",") for csv in input])
         #aggDF["alpha-ksize"] =  "protein-k" + str(wildcards.ksize)
-        aggDF.to_csv(str(output), index=False)
+        #aggDF.to_csv(str(output), index=False)
+        
+        # aggregate all
+        #aggDF = pd.concat(dfs_to_concat)
+        print(aggDF.shape)
+        # drop duplicated comparisons
+        #aggDF.drop_duplicates(subset = "check_dupes", inplace=True)
+        #print(aggDF.shape)
+        # get average containment/ani
+        aggDF['avg_containment'] = aggDF[["f_query_match", "f_match_query"]].mean(axis=1)
+        aggDF['avg_containment_ani'] = aggDF[["query_ani", "match_ani"]].mean(axis=1)
+        # bin by containment; compare ANI
+        containment_bins05 = np.arange(0, 1.01, 0.05)
+        aggDF['binned_avg_containment05'] = pd.cut(x=aggDF['avg_containment'], bins=containment_bins05)
+        contain05_info = aggDF.groupby('binned_avg_containment05').agg({'avg_containment_ani': ['count','min', 'max', 'mean']}).round(2)
+        contain05_info.columns = contain05_info.columns.droplevel()
+        contain05_info.reset_index(inplace=True)
+        rename_cols = {"min": "minAAI", "max": "maxAAI", "mean": "meanAAI"}
+        contain05_info.rename(columns = rename_cols, inplace=True)
+        # make separate col with str so we can modify it. keep categorical col for plotting.
+        contain05_info['crange'] = contain05_info['binned_avg_containment05'].astype("str")
+        contain05_info['highContainment'] = contain05_info['crange'].str.split(',', expand=True)[1].str.rstrip(']').str.strip()
+        contain05_info.drop(columns=["crange"], inplace=True) # no need for this dup col. keep categorical col for plotting.
+        contain05_info.to_csv(output.binned_containment_aai, index=False)
+        # todo: maybe plot ANI?
+        ani_rename = {"avg_containment_ani": "avg_containment_aai", "jaccard_ani_ci_high": "jaccard_aai_ci_high", "jaccard_ani", "jaccard_aai", "jaccard_ani_ci_low": "jaccard_aai_ci_low", "max_containment_ani": "max_containment_aai", "query_ani": "query_aai", "query_ani_ci_low": "query_aai_ci_low", "query_ani_ci_high": "query_aai_ci_high", "match_ani": "match_aai", "match_ani_ci_low": "match_ani_ci_low", "match_ani_ci_high": "match_aai_ci_high"}
+        aggDF.rename(columns=ani_rename, inplace=True)
+        aggDF.to_csv(str(output.full_output), index=False) 
+        import seaborn as sns
+        import numpy as np
+        import matplotlib.pyplot as plt
+        import matplotlib.ticker as ticker
+
+        with sns.plotting_context("paper", font_scale=1.7,rc={"font.size":25,"axes.titlesize":20,"axes.labelsize":20}):
+            sns.set_style("whitegrid")
+            g=sns.relplot(data=fm, x="avg_containment_ani", y="avg_containment", alpha=0.2)
+            for ax in g.fig.axes:
+                ax.xaxis.set_major_formatter(ticker.PercentFormatter(xmax=1,decimals=0))
+                #ax.yaxis.set_major_formatter(ticker.PercentFormatter(xmax=1,decimals=0))
+            g.fig.suptitle(f'k{ksize}', size=20)
+            plt.xlabel("Avg Containment AAI", size=20, labelpad=15)
+            plt.ylabel("Avg Containment", size=25)
+            g.tight_layout()
+            fig = g.get_figure()
+            fig.savefig(str(output.cAAI_png)))
+            fig.savefig(str(output.cAAI_pdf)))
+
 
 localrules: aggregate_allgtdb_nucl_prefetch
 rule aggregate_allgtdb_nucl_prefetch:
@@ -307,7 +399,7 @@ rule aggregate_allgtdb_nucl_prefetch:
         contain05_info.to_csv(output.binned_containment_ani, index=False)
         # todo: maybe plot ANI?
         aggDF.to_csv(str(output.full_output), index=False)
-        
+
         #aggDF = pd.concat([pd.read_csv(str(csv), sep=",") for csv in input])
         #aggDF["alpha-ksize"] =  "protein-k" + str(wildcards.ksize)
         #aggDF[~aggDF["match_name"] == aggDF["query_name"]]

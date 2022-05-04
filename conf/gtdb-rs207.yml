@@ -1,0 +1,31 @@
+# location for all generated files
+basename: gtdb-rs207
+
+output_dir: output.rank-compare 
+
+#taxonomy_csv: conf/gtdb-rs207.taxonomy.with-repinfo.csv 
+#taxonomy_csv: conf/gtdb-rs207-no-202.taxonomy.with-repinfo.csv 
+#taxonomy_csv: conf/gtdb-rs207-no-202.taxonomy.with-repinfo.no-GCA_905332505.2.csv 
+taxonomy_csv: conf/gtdb-rs207.taxonomy.with-repinfo-no-GCA_905332505.2.csv 
+
+run_alphabets:
+  #- nucleotide
+  - protein
+  #- dayhoff
+
+
+alphabet_info:
+  nucleotide:
+    ksize: [21,31,51]
+    scaled: [1000,2000]
+  protein:
+    #ksize: [7,8,9,10,11]
+    ksize: [7,10]
+    #scaled: [100]
+    scaled: [200]
+  #dayhoff:
+  #  ksize: [14,15,16,17,18,19]
+  #  scaled: [100,200]
+  #hp:
+  #  ksize: [32,35,42]
+  #  scaled: [100,200]
