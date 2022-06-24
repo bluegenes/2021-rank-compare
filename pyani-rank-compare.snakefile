@@ -34,13 +34,13 @@ alltax_at_rank = taxDF[compare_rank].unique().tolist()
 #taxDF.set_index("ident", inplace=True)
 all_comparisons = []
 ranktaxD = defaultdict(list)
-for ranktax in alltax_at_rank:
+for ranktax in alltax_at_rank[:50]:
     # get query_idents
     subDF = taxDF[(taxDF[compare_rank] == ranktax)]
     all_accs = subDF["ident"].to_list()
-    # testing:let's start smaller: ignore >5k comparisons
     num_acc = len(all_accs)
-    if 2 <= num_acc <= 100 : # can't compare a single genome :)
+    # testing:let's start smaller: ignore >100 comparisons
+    if 2 <= num_acc <= 500: # can't compare a single genome :)
         rt = ranktax.replace(' ', '_') # no spaces plsss
         ranktaxD[rt] = all_accs
 
@@ -60,7 +60,7 @@ onerror:
 rule all:
     input: 
         # pyani
-        #os.path.join(out_dir, "pyani", f"{compare_rank}.pyani-ANIm.csv.gz"),
+        os.path.join(out_dir, "pyani", f"{compare_rank}.pyani-ANIm.csv.gz"),
         os.path.join(out_dir, "pyani", f"{compare_rank}.pyani-ANIb.csv.gz"),
 
 
@@ -147,8 +147,8 @@ rule pyani_ANIm:
         pyanidb = lambda w: os.path.join(out_dir, 'pyani', w.ranktax, f".pyani-{w.ranktax}/pyanidb"),
         genome_dir = lambda w: os.path.join(out_dir, 'pyani', w.ranktax),
         output_dir = lambda w: os.path.join(out_dir, 'pyani', w.ranktax, "ANIm_results"),
-    log: os.path.join(logs_dir, "pyani", "{ranktax}/{ranktax}.pyANI-aniM.log")
-    benchmark: os.path.join(logs_dir, "pyani", "{ranktax}/{ranktax}.pyANI-aniM.benchmark")
+    log: os.path.join(logs_dir, "pyani_anim", "{ranktax}.pyANI-aniM.log")
+    benchmark: os.path.join(logs_dir, "pyani_anim", "{ranktax}.pyANI-aniM.benchmark")
     conda: "conf/envs/pyani0.3.yml"
     shell:
         """
