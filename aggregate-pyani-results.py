@@ -113,8 +113,13 @@ def main(args):
             # now grab pyani values
             pyani_ident, pyani_coverage, pyani_aln_length, pyani_sim_errors, pyani_hadamard = np.nan, np.nan, np.nan, np.nan, np.nan
 
-            a_label = [x for x in names if x.startswith(a)][0]
-            b_label = [x for x in names if x.startswith(b)][0]
+            try:
+                a_label = [x for x in names if x.startswith(a)][0]
+                b_label = [x for x in names if x.startswith(b)][0]
+            except IndexError:
+                print(f"skipping comparison {a}_x_{b}")
+                continue # skip this comparison
+
 
             # matrix will not be symmetric. Average values for each direction.
             pyani_identA = idD.at[a_label, b_label]

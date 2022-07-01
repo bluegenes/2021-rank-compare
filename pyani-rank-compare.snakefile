@@ -18,8 +18,6 @@ reps_only = config.get('representatives_only', True)
 print('reading taxonomy')
 gtdb_taxonomy=config.get('gtdb_taxonomy', 'conf/gtdb-rs207.taxonomy.with-repinfo.csv')
 taxDF = pd.read_csv(gtdb_taxonomy)
-# let's subset for testing
-taxDF = taxDF.tail(100000)
 
 # get fastapaths
 fa_info = pd.read_csv("/home/ntpierce/2021-rank-compare/gtdb-rs207.fromfile.csv") # cols: ident, name, genome_filename, protein_filename
@@ -34,13 +32,13 @@ alltax_at_rank = taxDF[compare_rank].unique().tolist()
 #taxDF.set_index("ident", inplace=True)
 all_comparisons = []
 ranktaxD = defaultdict(list)
-for ranktax in alltax_at_rank[:50]:
+for ranktax in alltax_at_rank:
     # get query_idents
     subDF = taxDF[(taxDF[compare_rank] == ranktax)]
     all_accs = subDF["ident"].to_list()
     num_acc = len(all_accs)
-    # testing:let's start smaller: ignore >100 comparisons
-    if 2 <= num_acc <= 500: # can't compare a single genome :)
+    # testing:let's start smaller: ignore >50 comparisons
+    if 2 <= num_acc <= 100: # can't compare a single genome :)
         rt = ranktax.replace(' ', '_') # no spaces plsss
         ranktaxD[rt] = all_accs
 
@@ -74,7 +72,7 @@ def get_genomes_for_pyani(w):
 
 ### split into genome folders + unzip fna files and generate classes/labels, then run pyANI index and compare 
 # make a folder with just the genomes in a single ranktax
-localrules: make_pyani_ranktax_folder
+#localrules: make_pyani_ranktax_folder
 rule make_pyani_ranktax_folder:
     input:
         get_genomes_for_pyani
@@ -84,6 +82,10 @@ rule make_pyani_ranktax_folder:
     params:
         acc_list = lambda w: ranktaxD[w.ranktax],
         taxdir = lambda w: os.path.join(out_dir, 'pyani', w.ranktax),
+    resources:
+        mem_mb=lambda wildcards, attempt: attempt *3000,
+        time=1200,
+        partition="med2",
     run:
         import hashlib
         os.makedirs(params.taxdir, exist_ok=True)
@@ -121,6 +123,10 @@ rule pyani_index_and_createdb:
         pyanidb = lambda w: os.path.join(out_dir, 'pyani', w.ranktax, f".pyani-{w.ranktax}/pyanidb"),
         classes_basename = "classes.txt",
         labels_basename = "labels.txt"
+    resources:
+        mem_mb=lambda wildcards, attempt: attempt *3000,
+        time=1200,
+        partition="med2",
     log: os.path.join(logs_dir, "pyani", "{ranktax}.index-and-createdb.log")
     benchmark: os.path.join(logs_dir, "pyani", "{ranktax}.index-and-createdb.benchmark")
     conda: "conf/envs/pyani0.3.yml"
@@ -141,8 +147,9 @@ rule pyani_ANIm:
         directory(os.path.join(out_dir, "pyani", "{ranktax}/ANIm_results/nucmer_output")),
     threads: 1
     resources:
-        mem_mb=lambda wildcards, attempt: attempt *5000,
-        runtime=1200,
+        mem_mb=lambda wildcards, attempt: attempt *10000,
+        time=1200,
+        partition="med2"
     params:
         pyanidb = lambda w: os.path.join(out_dir, 'pyani', w.ranktax, f".pyani-{w.ranktax}/pyanidb"),
         genome_dir = lambda w: os.path.join(out_dir, 'pyani', w.ranktax),
@@ -173,8 +180,9 @@ rule pyANI_ANIb:
         bn =  os.path.join(out_dir, "pyani/{ranktax}/ANIb_results","blastn_output.tar.gz"),
     threads: 1
     resources:
-        mem_mb=lambda wildcards, attempt: attempt *5000,
-        runtime=1200,
+        mem_mb=lambda wildcards, attempt: attempt *10000,
+        time=1200,
+        partition="med2"
     params:
         #pyanidb = lambda w: os.path.join(out_dir, 'pyani/paths', w.path, f".pyani-{w.path}/pyanidb"),
         genome_dir = lambda w: os.path.join(out_dir, 'pyani', w.ranktax),
@@ -201,8 +209,9 @@ rule pyANI_report_ANIm:
         hadF = os.path.join(out_dir, "pyani/{ranktax}/ANIm_results/matrix_hadamard_1.tab"),
     threads: 1
     resources:
-        mem_mb=lambda wildcards, attempt: attempt *5000,
-        runtime=1200,
+        mem_mb=lambda wildcards, attempt: attempt *3000,
+        time=1200,
+        partition="med2"
     params:
         ANIm_dir = lambda w: os.path.join(out_dir, 'pyani', w.ranktax, "ANIm_results"),
         pyanidb = lambda w: os.path.join(out_dir, 'pyani', w.ranktax, f".pyani-{w.ranktax}/pyanidb"),
@@ -216,7 +225,7 @@ rule pyANI_report_ANIm:
         --dbpath {params.pyanidb} -l {log}
         """
 
-localrules: aggregate_ranktax_anim
+#localrules: aggregate_ranktax_anim
 rule aggregate_ranktax_anim:
     input:
         idF = os.path.join(out_dir, "pyani/{ranktax}/ANIm_results/matrix_identity_1.tab"),
@@ -229,12 +238,16 @@ rule aggregate_ranktax_anim:
     params:
         results_dir =  os.path.join(out_dir, "pyani/{ranktax}/ANIm_results"),
         compare_rank = compare_rank,
+    resources:
+        mem_mb=lambda wildcards, attempt: attempt *3000,
+        time=1200,
+        partition="med2"
     shell:
         """
         python aggregate-pyani-results.py {params.results_dir} --rank {params.compare_rank} --ranktax-name {wildcards.ranktax} --output-csv {output}
         """
 
-localrules: aggregate_ranktax_anib
+#localrules: aggregate_ranktax_anib
 rule aggregate_ranktax_anib:
     input:
         covF= os.path.join(out_dir, "pyani/{ranktax}/ANIb_results", "ANIb_alignment_coverage.tab"),
@@ -247,6 +260,10 @@ rule aggregate_ranktax_anib:
     params:
         results_dir =  os.path.join(out_dir, "pyani/{ranktax}/ANIb_results"),
         compare_rank = compare_rank,
+    resources:
+        mem_mb=lambda wildcards, attempt: attempt *3000,
+        time=1200,
+        partition="med2"
     shell:
         """
         python aggregate-pyani-results.py {params.results_dir} --rank {params.compare_rank} --ranktax-name {wildcards.ranktax} --output-csv {output} --pyani-version v0.2
