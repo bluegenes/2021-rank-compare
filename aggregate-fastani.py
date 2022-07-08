@@ -104,6 +104,7 @@ def main(args):
                 rev_qfrag = fastani.at[rev_name, "total_query_frags"]
 
                 # get directional alignment fractions
+                # alignment fraction = count_bidirectional_frag_mappings/total_query_frags
                 comp_af = float(comp_fmap)/float(comp_qfrag)
                 rev_af = float(rev_fmap)/float(rev_qfrag)
                 avg_af = np.mean([comp_af, rev_af])

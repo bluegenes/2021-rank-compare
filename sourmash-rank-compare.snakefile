@@ -42,9 +42,9 @@ for ranktax in alltax_at_rank:
     all_accs = subDF["ident"].to_list()
     num_acc = len(all_accs)
     # testing:let's start smaller: ignore >50 comparisons
-    if 2 <= num_acc <= 100: # can't compare a single genome :)
+    if 2 <= num_acc <= 200: # can't compare a single genome :)
         rt = ranktax.replace(' ', '_') # no spaces plsss
-        grepD[ranktax] = [rt]
+        grepD[rt] = [ranktax]
         ranktaxD[rt] = all_accs
         these_rta = expand(f"{rt}/{{acc}}", acc = all_accs)
         ranktaxacc.extend(these_rta)
@@ -64,7 +64,7 @@ onerror:
 
 rule all:
     input: 
-        expand(f"{out_dir}/prefetch/{compare_rank}/gtdb-rs207.nucleotide-k{{ksize}}-scaled{{scaled}}.ani.csv", ksize = [21,31,51], scaled=[1000]) # 31,51
+        expand(f"{out_dir}/prefetch/{compare_rank}/gtdb-rs207.nucleotide-k{{ksize}}-scaled{{scaled}}.ani.csv", ksize = [21], scaled=[1000]) # 31,51
         #os.path.join(out_dir, "sourmash", f"{compare_rank}.sourmash-k{ksize}-scaled1000.ANI.csv.gz"),
         #expand(f"{out_dir}/prefetch/{compare_rank}/{{rta}}.nucleotide-k{{ksize}}-scaled1000.prefetch.csv", rta=ranktaxacc, ksize = [21,31,51]), #run: 21,31,51
         #expand(f"{out_dir}/prefetch/{compare_rank}/{{rank_tax}}.picklist.csv",rank_tax = ranktaxD.keys()),
@@ -100,7 +100,7 @@ rule write_picklist:
 
 rule nucl_rank_prefetch:
     input:
-        db = f"{database_dir}/gtdb-rs207.genomic.k{{ksize}}.sbt.zip", # scaled 1000
+        db = f"{database_dir}/gtdb-rs207.genomic.k{{ksize}}.zip", # scaled 1000
         rt_picklist = f"{out_dir}/prefetch/{compare_rank}/{{rank_tax}}.picklist.csv",
         taxonomy = gtdb_taxonomy,
     output: 
@@ -109,7 +109,7 @@ rule nucl_rank_prefetch:
         alpha= "--dna",
         threshold_bp=10000,
         rt = lambda w: grepD[w.rank_tax],
-        tmp_db=f"{out_dir}/prefetch/{compare_rank}/{{rank_tax}}.nucleotide-k{{ksize}}-scaled{{scaled}}.sbt.zip",
+        tmp_db=f"{{rank_tax}}.nucleotide-k{{ksize}}-scaled{{scaled}}.zip",
     log: f"{logs_dir}/prefetch/{compare_rank}/{{rank_tax}}/{{acc}}.nucleotide-k{{ksize}}-scaled{{scaled}}.prefetch.log"
     benchmark: f"{logs_dir}/prefetch/{compare_rank}/{{rank_tax}}/{{acc}}.nucleotide-k{{ksize}}-scaled{{scaled}}.prefetch.benchmark",
     conda: "conf/envs/sourmash-4.4.yml"
@@ -117,31 +117,26 @@ rule nucl_rank_prefetch:
     resources:
         mem_mb=lambda wildcards, attempt: attempt * 3000,
         time=240,
-        runtime=240,
+        runtime=30,
         partition="low2",
     shell:
         """
         echo "DB is {input.db}"
         echo "DB is {input.db}" > {log}
 
-        # build temp database
-        sourmash sig extract --picklist {input.rt_picklist}:ident:identprefix {input.db} -o {params.tmp_db}
-        sourmash sig fileinfo {params.tmp_db}
-        sourmash sig fileinfo {params.tmp_db} >> {log}
-
-        sourmash sig grep {wildcards.acc} {params.tmp_db} \
-                 --ksize {wildcards.ksize} | sourmash prefetch - {params.tmp_db} \
+        sourmash sig grep {wildcards.acc} {input.db} \
+                 --ksize {wildcards.ksize} | sourmash prefetch - {input.db} \
                  -o {output.prefetch} -k {wildcards.ksize} {params.alpha} \
+                 --picklist {input.rt_picklist}:ident:identprefix \
                  --threshold-bp={params.threshold_bp} --scaled {wildcards.scaled} 2>> {log}
         touch {output} # touch to prevent err with empty prefetch results
-        rm -rf {params.tmp_db}
         """
 
 rule write_prefetch_filelist:
     input: lambda w: expand(f"{out_dir}/prefetch/{compare_rank}/{{rta}}.nucleotide-k{{ksize}}-scaled{{scaled}}.prefetch.csv", rta=ranktaxacc, ksize = w.ksize, scaled=w.scaled)
     output: f"{out_dir}/prefetch/{compare_rank}/gtdb-rs207.nucleotide-k{{ksize}}-scaled{{scaled}}.prefetch.filelist",
     run:
-        with open(output, 'w') as outF:
+        with open(str(output), 'w') as outF:
             for inF in input:
                 fn = os.path.abspath(str(inF))
                 outF.write(f"{fn}\n")
@@ -157,9 +152,9 @@ rule prefetch_to_ani_csv:
     threads: 1
     resources:
         mem_mb=lambda wildcards, attempt: attempt * 3000,
-        time=240,
+        time=30,
         partition="low2",
     shell:
         """
-        python prefetch-to-ani-csv --from-file {input.pf_filelist} --taxonomy {input.taxonomy} --recalculate-ani -o {output} 2> {log}
+        python prefetch-to-ani-csv.py --from-file {input.pf_filelist} --taxonomy {input.taxonomy} --recalculate-ani -o {output} 2> {log}
         """

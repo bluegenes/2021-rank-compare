@@ -3,10 +3,7 @@ basename: gtdb-rs207
 
 output_dir: output.rank-compare 
 
-#taxonomy_csv: conf/gtdb-rs207.taxonomy.with-repinfo.csv 
-#taxonomy_csv: conf/gtdb-rs207-no-202.taxonomy.with-repinfo.csv 
-#taxonomy_csv: conf/gtdb-rs207-no-202.taxonomy.with-repinfo.no-GCA_905332505.2.csv 
-taxonomy_csv: conf/gtdb-rs207.taxonomy.with-repinfo-no-GCA_905332505.2.csv 
+taxonomy_csv: conf/gtdb-rs207.taxonomy.with-repinfo.csv 
 
 run_alphabets:
   #- nucleotide

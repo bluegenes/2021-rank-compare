@@ -18,8 +18,6 @@ reps_only = config.get('representatives_only', True)
 print('reading taxonomy')
 gtdb_taxonomy=config.get('gtdb_taxonomy', 'conf/gtdb-rs207.taxonomy.with-repinfo.csv')
 taxDF = pd.read_csv(gtdb_taxonomy)
-# let's subset for testing
-taxDF = taxDF.tail(100000)
 
 # get fastapaths
 fa_info = pd.read_csv("/home/ntpierce/2021-rank-compare/gtdb-rs207.fromfile.csv") # cols: ident, name, genome_filename, protein_filename
@@ -38,7 +36,7 @@ for ranktax in alltax_at_rank:
     all_accs = subDF["ident"].to_list()
     num_acc = len(all_accs)
     # testing:let's start smaller: ignore >500 comparisons
-    if 2 <= num_acc <= 50: # can't compare a single genome :)
+    if 2 <= num_acc <= 500: # can't compare a single genome :)
         rt = ranktax.replace(' ', '_') # no spaces plsss
         ranktaxD[rt] = all_accs
 
@@ -64,9 +62,13 @@ rule all:
 
 
 ### fastANI rules ###
-localrules: build_filepaths_for_fastani
+#localrules: build_filepaths_for_fastani
 rule build_filepaths_for_fastani:
     output: os.path.join(out_dir, "fastani","{ranktax}.filepaths.txt")
+    resources:
+        mem_mb=lambda wildcards, attempt: attempt *3000,
+        time=1200,
+        partition="med2",
     run:
         with open(str(output), "w") as out:
             acc_list = ranktaxD[wildcards.ranktax]
@@ -78,26 +80,30 @@ rule build_filepaths_for_fastani:
 rule compare_via_fastANI:
     input: os.path.join(out_dir, "fastani", "{ranktax}.filepaths.txt")
     output: os.path.join(out_dir, "fastani","{ranktax}.fastani.tsv"),
-    threads: 1
+    threads: 11
     resources:
         mem_mb=lambda wildcards, attempt: attempt *3000,
-        time=1200,
+        time=12000,
         partition="med2",
     log: os.path.join(logs_dir, "fastani", "{ranktax}.fastani.log")
     benchmark: os.path.join(logs_dir, "fastani", "{ranktax}.fastani.benchmark")
     conda: "conf/envs/fastani.yml"
     shell:
         """
-        fastANI --ql {input} --rl {input} -o {output} 2> {log}
+        fastANI --threads {threads} --ql {input} --rl {input} -o {output} 2> {log}
         """
 
 
-localrules: parse_fastani_ranktax
+#localrules: parse_fastani_ranktax
 rule parse_fastani_ranktax:
     input: os.path.join(out_dir, "fastani", "{ranktax}.fastani.tsv")
     output: os.path.join(out_dir, "fastani", "{ranktax}.fastani.parsed.csv")
     params:
         compare_rank= compare_rank,
+    resources:
+        mem_mb=lambda wildcards, attempt: attempt *3000,
+        time=12000,
+        partition="med2",
     log: os.path.join(logs_dir, "fastani", "{ranktax}.parse_fastani.log")
     benchmark: os.path.join(logs_dir, "fastani", "{ranktax}.parse_fastani.benchmark")
     shell:
