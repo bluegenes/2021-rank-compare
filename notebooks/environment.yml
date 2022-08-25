@@ -1,0 +1,14 @@
+name: 2021-rank-compare-nb
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - python=3.8
+  - pandas>=1.2.4
+  - seaborn=0.11.0
+  - sourmash>=4.2.1
+  - jupyterlab
+  - ipywidgets
+  - tqdm
+  #- lxml=4.6.3

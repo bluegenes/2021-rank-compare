@@ -1,3 +1,4 @@
 *csv
 *.sig
 */
+.DS_Store
