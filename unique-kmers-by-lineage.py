@@ -128,3 +128,9 @@ def test_get_lca_lineage():
     print(lca_lin)
     assert lca_lin == lca_utils.make_lineage("a")
 
+def test_get_lca_lineage_single():
+    lin1 = lca_utils.make_lineage("a;b;c")
+
+    lca_lin, num_nodes = get_lca_lineage([lin1])
+    print(lca_lin)
+    assert lca_lin == lca_utils.make_lineage("a;b;c")
