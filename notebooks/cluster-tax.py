@@ -47,7 +47,7 @@ def count_and_find_lca(row, lineages=taxD): #, counts=countD):
         # handle bug
         if idt.startswith('CF'):
             idt = "G" + idt
-            #print(idt)
+            print(idt)
         lineage = taxD[idt]
         all_lineages.append(lineage)
     lca_tree = lca_utils.build_tree(all_lineages)
@@ -59,7 +59,7 @@ def count_and_find_lca(row, lineages=taxD): #, counts=countD):
 
 for cluster_percent in cluster_thresholds:
     notify(f"Clustering at {cluster_percent}%:")
-    cluster_file = f"regtdbclustering/renamed_gtdb_genomic_k31_s1k_kSpider_clusters_{cluster_percent}.0%.tsv.gz"
+    cluster_file = f"regtdbclustering/renamed_gtdb_genomic_k31_s1k_kSpider_clusters_{cluster_percent}.0%.tsv"
     clusters = pd.read_csv(cluster_file, sep='\t', header=None, index_col=False, names = ["cluster_idents"])
     # add taxonomy
     clusters_w_tax = clusters.progress_apply(count_and_find_lca, axis=1)
